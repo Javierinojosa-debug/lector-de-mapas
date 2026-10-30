@@ -142,6 +142,7 @@ button.mini{padding:3px 8px;font-size:13px}
 @keyframes blinkEye{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
 @media (prefers-reduced-motion:reduce){.talking #mouth rect,.eye{animation:none}}
 #splash button{font-size:18px;padding:12px 20px}
+.splashBtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 #splash .skip{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;padding:4px}
 @keyframes blink{50%{opacity:0}}.cur{display:inline-block;width:.6em;height:1em;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite}
 @media (prefers-reduced-motion:reduce){.cur{animation:none}}
@@ -196,7 +197,7 @@ button.mini{padding:3px 8px;font-size:13px}
     <div class="rank">Asistente de topografía · Carta 1:50.000</div>
     <h2 id="splashTitle" hidden>Bienvenida, Dama Cadete Forteza</h2>
     <p id="splashText" hidden></p>
-    <button type="button" class="primary" id="startMission">Iniciar misión</button>
+    <div class="splashBtns"><button type="button" class="primary" id="startMission">Iniciar misión</button><button type="button" id="otherGreeting" hidden>Otro saludo</button></div>
   </div>
 </div>
 <div class="wrap">
@@ -749,7 +750,7 @@ const JOKES=[
  'Bienvenida, dama cadete Forteza. Antes de empezar: el mapa se sujeta con las letras hacia arriba. Con esto ya llevamos media guerra ganada.'];
 const WKEY='bienvenida-forteza';let seen=null;try{seen=JSON.parse(localStorage.getItem(WKEY))}catch(e){}
 let jokeIdx=-1;if(seen&&seen.first){do{jokeIdx=Math.floor(Math.random()*JOKES.length)}while(JOKES.length>1&&jokeIdx===seen.last)}
-const WELCOME=jokeIdx<0?FIRST:JOKES[jokeIdx];
+let WELCOME=jokeIdx<0?FIRST:JOKES[jokeIdx];
 function markSeen(){try{localStorage.setItem(WKEY,JSON.stringify({first:true,last:jokeIdx}))}catch(e){}}
 function pickVoice(){try{const v=speechSynthesis.getVoices();return v.find(x=>/^es[-_]ES/i.test(x.lang)&&/google|mónica|monica|jorge|pablo|álvaro|alvaro|elvira/i.test(x.name))||v.find(x=>/^es[-_]ES/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}catch(e){return null}}
 function speak(text,onDone){let done=false;const fin=()=>{if(done)return;done=true;$('#splash').classList.remove('talking');onDone&&onDone()};
@@ -761,9 +762,11 @@ let typeTimer=0;function typeText(cb){const el=$('#splashText');clearInterval(ty
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=WELCOME;cb&&cb();return}
   typeTimer=setInterval(()=>{i+=1;el.innerHTML=esc(WELCOME.slice(0,i))+'<span class="cur"></span>';if(i>=WELCOME.length){clearInterval(typeTimer);el.textContent=WELCOME;cb&&cb()}},55)}
 function closeSplash(){try{speechSynthesis.cancel()}catch(e){}$('#splash').hidden=true}
-$('#startMission').onclick=()=>{const btn=$('#startMission');btn.hidden=true;$('#splashTitle').hidden=false;$('#splashText').hidden=false;
-  let spoken=false,typed=false;const ready=()=>{if(spoken&&typed){btn.textContent='Entrar';btn.onclick=closeSplash;btn.hidden=false;btn.focus()}};
-  speak(WELCOME,()=>{spoken=true;markSeen();ready()});typeText(()=>{typed=true;ready()})};
+function playWelcome(){const btn=$('#startMission'),other=$('#otherGreeting');btn.hidden=true;other.hidden=true;$('#splashTitle').hidden=false;$('#splashText').hidden=false;
+  let spoken=false,typed=false;const ready=()=>{if(spoken&&typed){btn.textContent='Entrar';btn.onclick=closeSplash;btn.hidden=false;other.hidden=false;btn.focus()}};
+  speak(WELCOME,()=>{spoken=true;markSeen();ready()});typeText(()=>{typed=true;ready()})}
+$('#startMission').onclick=playWelcome;
+$('#otherGreeting').onclick=()=>{let k;do{k=Math.floor(Math.random()*JOKES.length)}while(JOKES.length>1&&(k===jokeIdx||JOKES[k]===WELCOME));jokeIdx=k;WELCOME=JOKES[k];playWelcome()};
 $('#replay').onclick=()=>speak(WELCOME);
 
 /* ---------- pestañas, guardado y arranque ---------- */
