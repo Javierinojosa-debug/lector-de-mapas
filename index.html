@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1C221D">
+<title>Lector de Mapas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: foto del mapa con herramientas de marcado a la izquierda; conversación con la IA a la derecha. En móvil, mapa arriba y chat debajo. */
+:root{
+  --bg:#EBEEE7; --surface:#F7F8F4; --ink:#1C221D; --muted:#5A6557; --line:#CBD2C4; --chip:#DFE4D8;
+  --accent:#B3261E; --accent-ink:#FFFFFF; --bad:#B3261E; --bad-bg:#F7E3E1; --me:#E4E9DD;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141915; --surface:#1C221D; --ink:#E4E9E0; --muted:#9BA696; --line:#2E372F; --chip:#273027;
+  --accent:#EF5A50; --accent-ink:#1A0F0E; --bad:#F27A71; --bad-bg:#3A1C1A; --me:#253025; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141915; --surface:#1C221D; --ink:#E4E9E0; --muted:#9BA696; --line:#2E372F; --chip:#273027;
+  --accent:#EF5A50; --accent-ink:#1A0F0E; --bad:#F27A71; --bad-bg:#3A1C1A; --me:#253025; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1320px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{margin-bottom:16px}
+.eyebrow{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(34px,5vw,52px);line-height:.95;margin:4px 0 6px;text-wrap:balance}
+h1 span{color:var(--accent)}
+.lede{margin:0;color:var(--muted);max-width:62ch}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);gap:20px;align-items:start}
+@media (max-width:920px){.layout{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);padding:14px;min-width:0}
+.mlabel{font-family:var(--f-display);font-weight:600;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+button,.btnlike{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:8px 12px;cursor:pointer;line-height:1.1;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btnlike:hover{background:var(--chip)}
+button:focus-visible,.btnlike:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.primary,.btnlike.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tools{display:flex;flex-wrap:wrap;gap:0}
+.tools button{border-right-width:0;font-size:14px}
+.tools button:last-child{border-right-width:1.5px}
+.tools button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.stage{position:relative;overflow:auto;border:2px solid var(--ink);background:var(--chip);max-height:78vh;-webkit-overflow-scrolling:touch}
+#cv{display:block;width:100%;height:auto}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:48px 20px;border:2px dashed var(--line);background:var(--bg);min-height:340px}
+.empty.drag{border-color:var(--accent)}
+.empty h2{font-family:var(--f-display);font-weight:700;font-size:26px;margin:0}
+.steps{display:grid;gap:6px;text-align:left;max-width:40ch;margin:0;padding-left:20px;color:var(--muted)}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+.marks{font-size:13.5px;color:var(--muted);margin-top:8px;min-height:20px}
+.marks b{font-family:var(--f-mono);color:var(--ink);font-weight:500}
+.sheetdata{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:12px}
+.sheetdata label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted)}
+.sheetdata input,textarea{font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);padding:7px 8px;width:100%;min-width:0}
+.sheetdata input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--ink)}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow-y:auto;padding-right:2px;margin-bottom:12px}
+.msg{padding:10px 12px;font-size:14.5px;min-width:0;overflow-wrap:anywhere}
+.msg.me{background:var(--me);align-self:flex-end;max-width:90%;font-weight:500}
+.msg.ai{border-left:3px solid var(--accent);background:var(--bg)}
+.msg.err{border-left-color:var(--bad);background:var(--bad-bg)}
+.msg .who{font-family:var(--f-display);font-weight:700;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.msg h4{font-family:var(--f-display);font-size:17px;margin:10px 0 4px}
+.msg p{margin:6px 0}
+.msg ul,.msg ol{margin:6px 0;padding-left:20px}
+.msg code{font-family:var(--f-mono);font-size:.92em;background:var(--chip);padding:0 4px}
+.aitag{color:#0B5FD6;font-weight:600}
+.thinking{color:var(--muted);font-style:italic}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.quick button{text-transform:none;letter-spacing:0;font-family:var(--f-body);font-weight:500;font-size:13.5px;padding:5px 9px;border-width:1px}
+textarea{font-family:var(--f-body);font-size:15px;resize:vertical;min-height:64px}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.warn{font-size:13.5px;padding:10px 12px;background:var(--bad-bg);border-left:3px solid var(--bad);margin-bottom:10px}
+.ptabs{display:grid;grid-template-columns:1fr 1fr;margin:-14px -14px 14px;border-bottom:1px solid var(--line)}
+.ptabs button{border:0;border-right:1px solid var(--line);justify-content:center;padding:12px 6px;font-size:15.5px;color:var(--muted)}
+.ptabs button:last-child{border-right:0}
+.ptabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+.navstep{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.navstep:first-child{border-top:0;padding-top:0;margin-top:0}
+.navstep h3{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase;margin:0 0 6px}
+.navstep .row{margin:8px 0}
+.seg{display:flex;flex-wrap:wrap}
+.seg button{border-right-width:0;font-size:14px;flex:1 1 auto;justify-content:center}
+.seg button:last-child{border-right-width:1.5px}
+.seg button[aria-pressed="true"],button[aria-pressed="true"].tog{background:var(--ink);color:var(--surface)}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);flex:1 1 120px;min-width:0}
+label.f input,label.f select,select.full{font-family:var(--f-mono);font-size:15px;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);padding:7px 8px;width:100%;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+td,th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{font-family:var(--f-display);letter-spacing:.06em;text-transform:uppercase;font-size:12.5px;color:var(--muted)}
+td.m{font-family:var(--f-mono);font-size:12.5px}
+button.mini{padding:3px 8px;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:8px 0}
+.stat{border:1px solid var(--line);padding:6px 8px;background:var(--bg)}
+.stat small{display:block;font-family:var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-size:12px}
+.stat b{font-family:var(--f-mono);font-weight:500;font-size:16px}
+.navmsg{font-size:13.5px;padding:8px 10px;border-left:3px solid #9A5B00;background:var(--bg);margin:8px 0}
+.navmsg.ok{border-color:#1D7449}
+.dis{opacity:.45;pointer-events:none}
+#ar{position:fixed;inset:0;background:#000;z-index:50;color:#fff;overflow:hidden}
+#ar video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#arShade{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(0,0,0,.45) 100%)}
+#arTop{position:absolute;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,0))}
+#arTop .big{font-family:var(--f-display);font-weight:700;font-size:40px;line-height:1}
+#arTop .lbl{font-family:var(--f-display);letter-spacing:.1em;text-transform:uppercase;font-size:13px;opacity:.85}
+#arTop .mono{font-family:var(--f-mono);font-size:13px}
+#arClose,#arrivedOk{border-color:#fff;color:#fff;background:rgba(0,0,0,.35)}
+#arrow{position:absolute;left:50%;top:50%;width:min(56vw,280px);height:min(56vw,280px);transform:translate(-50%,-50%);transition:transform .12s linear}
+#target{position:absolute;top:38%;transform:translate(-50%,-50%);text-align:center;font-family:var(--f-display);font-weight:700;font-size:18px;text-shadow:0 1px 4px #000}
+#target i{display:block;width:28px;height:28px;margin:0 auto 4px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px rgba(11,95,214,.8)}
+#arBottom{position:absolute;left:0;right:0;bottom:0;padding:10px 14px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.75));display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+#arBottom .info{font-size:14px}
+#arBottom .info b{font-family:var(--f-mono);font-weight:500}
+#arTurn{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.04em;text-transform:uppercase}
+#miniMap{width:120px;height:120px;border:2px solid #fff;background:#222;flex:none}
+#arrived{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(29,116,73,.88);font-family:var(--f-display);font-size:38px;font-weight:700;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Topografía militar · lectura de cartas con IA y guiado GPS</div>
+    <h1>Lector <span>de</span> Mapas</h1>
+    <p class="lede">Haz una foto al mapa, marca puntos y líneas encima y pregunta. La IA lee la carta, hace las cuentas y dibuja. En «Navegar» calibras la foto con la cuadrícula y te guía con GPS y cámara hasta el punto que elijas.</p>
+  </header>
+
+  <div class="layout">
+    <section class="card" aria-label="Mapa">
+      <div id="emptyBox" class="empty">
+        <h2>Sube la foto del mapa</h2>
+        <ol class="steps">
+          <li>Haz la foto de frente, con buena luz y sin sombras.</li>
+          <li>Que salgan los números de la cuadrícula y, si puedes, la escala y el diagrama de nortes.</li>
+          <li>Marca los puntos A, B… o las líneas sobre las que quieres preguntar.</li>
+        </ol>
+        <div class="row" style="justify-content:center">
+          <label class="btnlike primary" for="file">Hacer foto o elegir imagen</label>
+          <button id="btnDemo" type="button">Probar con un mapa de ejemplo</button>
+        </div>
+        <input id="file" type="file" accept="image/*">
+      </div>
+
+      <div id="mapBox" hidden>
+        <div class="toolbar">
+          <div class="tools" role="group" aria-label="Herramientas de marcado">
+            <button type="button" data-tool="pan" aria-pressed="false">Mover</button>
+            <button type="button" data-tool="point" aria-pressed="true">Punto</button>
+            <button type="button" data-tool="line" aria-pressed="false">Línea</button>
+            <button type="button" data-tool="free" aria-pressed="false">Trazo</button>
+          </div>
+          <div class="row">
+            <button id="zOut" type="button" aria-label="Alejar">−</button>
+            <button id="zIn" type="button" aria-label="Acercar">+</button>
+            <button id="undo" type="button">Deshacer</button>
+            <button id="clear" type="button">Borrar marcas</button>
+            <button id="clearAI" type="button" hidden>Quitar dibujo IA</button>
+          </div>
+        </div>
+        <div class="stage" id="stage"><canvas id="cv" width="10" height="10"></canvas></div>
+        <div class="marks" id="marks"></div>
+        <div class="marks" id="aiInfo" hidden></div>
+        <div class="row" style="margin-top:10px">
+          <label class="btnlike" for="file2">Cambiar foto</label>
+          <input id="file2" type="file" accept="image/*">
+        </div>
+        <div class="mlabel" style="margin-top:14px">Datos de la hoja (opcional, ayudan a la IA)</div>
+        <div class="sheetdata">
+          <label for="dEsc">Escala<input id="dEsc" placeholder="1:50.000"></label>
+          <label for="dEq">Equidistancia<input id="dEq" placeholder="20 m"></label>
+          <label for="dVar">Variación magnética<input id="dVar" placeholder="1° 30' W"></label>
+          <label for="dHuso">Huso y cuadrado<input id="dHuso" placeholder="30S TG"></label>
+        </div>
+      </div>
+    </section>
+
+    <aside class="card" aria-label="Panel">
+      <div class="ptabs" role="tablist">
+        <button type="button" role="tab" id="tbAI" aria-selected="true">Preguntar a la IA</button>
+        <button type="button" role="tab" id="tbNav" aria-selected="false">Navegar con GPS</button>
+      </div>
+      <div id="tabAI">
+      <div class="mlabel">Pregunta sobre lo que has marcado</div>
+      <div id="unavail" class="warn" hidden></div>
+      <div class="chat" id="chat" aria-live="polite">
+        <div class="msg ai"><div class="who">Lector</div><p>Sube la foto y marca en ella. Luego pregunta, por ejemplo: «¿Qué coordenadas tiene A?», «¿Cuánta distancia hay de A a B?» o «¿Qué acimut magnético sigo de A a B?».</p></div>
+      </div>
+      <div class="quick" id="quick">
+        <button type="button" data-q="Dame las coordenadas UTM de A con 6 cifras.">Coordenadas de A</button>
+        <button type="button" data-q="¿Qué distancia real hay entre A y B?">Distancia A–B</button>
+        <button type="button" data-q="¿Qué cota tiene A?">Cota de A</button>
+        <button type="button" data-q="¿Qué acimut de cuadrícula y magnético hay de A a B? Dalo en grados y en milésimas.">Acimut A→B</button>
+        <button type="button" data-q="¿Qué pendiente media hay entre A y B?">Pendiente A–B</button>
+        <button type="button" data-q="¿Se ve B desde A? Razona con el perfil del terreno.">¿Se ve B desde A?</button>
+        <button type="button" data-q="¿Qué forma del terreno hay en A?">Forma del terreno en A</button>
+        <button type="button" data-q="Marca en el mapa el punto más alto y el más bajo de la hoja y traza una línea entre ellos.">Punto más alto y más bajo</button>
+        <button type="button" data-q="Traza el camino de mínima pendiente de A a B.">Mínima pendiente A→B</button>
+        <button type="button" data-q="Traza la línea de máxima pendiente que baja desde A.">Máxima pendiente desde A</button>
+        <button type="button" data-q="Lee la información del margen: escala, equidistancia, huso, cuadrado y variación magnética.">Leer el margen</button>
+      </div>
+      <form id="form">
+        <label for="q" class="mlabel" style="display:block">Tu pregunta</label>
+        <textarea id="q" placeholder="Escribe la pregunta. Usa las letras de tus marcas (A, B, línea 1…)"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="primary" id="send" type="submit">Preguntar</button>
+          <button id="stop" type="button" hidden>Parar</button>
+          <button id="reset" type="button">Nueva conversación</button>
+        </div>
+        <p class="note">La IA puede leer mal un número si la foto está borrosa. Te dice qué ha leído para que lo compruebes en el mapa.</p>
+      </form>
+      </div>
+      <div id="tabNav" hidden>
+        <div class="navmsg" id="navMsg" hidden></div>
+        <div class="navstep">
+          <h3>1 · Calibrar la foto</h3>
+          <p class="note">Pulsa «Marcar cruce», toca en el mapa un cruce de líneas de la cuadrícula y escribe sus números tal como aparecen en el borde: X de la línea vertical y Y de la horizontal, en km. Mínimo 2 cruces; mejor 3 separados.</p>
+          <div class="row">
+            <label class="f" for="zone">Huso UTM<select id="zone"><option value="29">29 (oeste)</option><option value="30">30 (centro)</option><option value="31">31 (este)</option></select></label>
+            <label class="f" for="decl">Declinación (° Este +, Oeste −)<input id="decl" inputmode="decimal" value="0"></label>
+          </div>
+          <div class="row"><button type="button" class="tog" id="calMode" aria-pressed="false">Marcar cruce</button></div>
+          <div id="calForm" hidden>
+            <div class="row">
+              <label class="f" for="cE">X · línea vertical (km)<input id="cE" inputmode="decimal" placeholder="445"></label>
+              <label class="f" for="cN">Y · línea horizontal (km)<input id="cN" inputmode="decimal" placeholder="4472"></label>
+            </div>
+            <div class="row"><button type="button" class="primary" id="calSave">Guardar cruce</button><button type="button" id="calCancel">Cancelar</button></div>
+          </div>
+          <div id="calList"></div>
+        </div>
+        <div class="navstep needT">
+          <h3>2 · Salida y destino</h3>
+          <div class="row"><button type="button" class="primary" id="gpsOn">Activar GPS</button><span class="note" id="gpsState"></span></div>
+          <div class="seg" id="startSeg"><button type="button" data-v="gps">Salgo de mi posición</button><button type="button" data-v="map">Salida en el mapa</button></div>
+          <div class="row"><button type="button" class="tog" id="destMode" aria-pressed="false">Marcar destino</button><button type="button" class="tog" id="startMode" aria-pressed="false" hidden>Marcar salida</button></div>
+          <select class="full" id="destSel" aria-label="Usar un punto marcado como destino"></select>
+        </div>
+        <div class="navstep needT">
+          <h3>3 · Ruta</h3>
+          <div class="seg" id="typeSeg"><button type="button" data-v="recta">Más corta</button><button type="button" data-v="pend">Mínima pendiente</button><button type="button" data-v="linea">Línea dibujada</button></div>
+          <p class="note" id="typeHint"></p>
+          <div class="row" id="lineRow" hidden><select class="full" id="lineSel" aria-label="Línea a seguir"></select></div>
+          <div class="row"><button type="button" class="primary" id="calc">Calcular ruta</button><button type="button" id="goGuide" hidden>Ir al guiado</button></div>
+          <div id="routeOut"></div>
+        </div>
+        <div class="navstep needT" id="guideBox">
+          <h3>4 · Guiado</h3>
+          <div id="guideInfo"></div>
+          <div class="row"><button type="button" class="primary" id="arStart">Abrir cámara y brújula</button></div>
+          <p class="note">Sujeta el móvil en vertical, delante de ti. Si la flecha baila, calibra la brújula haciendo un ocho con el móvil y aléjate de coches, vallas y objetos metálicos.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="ar" hidden>
+  <video id="vid" playsinline muted autoplay></video>
+  <div id="arShade"></div>
+  <div id="target" hidden><i></i><span id="targetLbl"></span></div>
+  <svg id="arrow" viewBox="0 0 200 200" aria-hidden="true"><defs><filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity=".6"/></filter></defs><path id="arrowPath" d="M100 14 L160 120 L118 106 L118 186 L82 186 L82 106 L40 120 Z" fill="#0B5FD6" stroke="#fff" stroke-width="6" stroke-linejoin="round" filter="url(#sh)"/></svg>
+  <div id="arTop"><div><div class="lbl">Distancia al siguiente punto</div><div class="big" id="arDist">—</div><div class="mono" id="arSub"></div></div><button type="button" id="arClose">Salir</button></div>
+  <div id="arBottom"><div class="info"><div id="arTurn">—</div><div>Rumbo <b id="arBrg">—</b> · Brújula <b id="arHead">—</b></div><div class="mono" id="arAcc"></div></div><canvas id="miniMap" width="240" height="240"></canvas></div>
+  <div id="arrived" hidden>Has llegado<button type="button" id="arrivedOk">Cerrar</button></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const cv=$('#cv'),ctx=cv.getContext('2d');
+const RED='#D0141F';
+let aiMarks=[],img=null,marks=[],tool='point',zoom=1,drawing=null,turns=[],busy=false,ctl=null,photoURL=null;
+/* ---------- navegación: UTM ---------- */
+const DEG=Math.PI/180;
+const UTM=(()=>{const a=6378137,f=1/298.257223563,e2=f*(2-f),ep2=e2/(1-e2),k0=0.9996,D=DEG,e4=e2*e2,e6=e4*e2;
+function fwd(lat,lon,zone){const p=lat*D,l0=((zone-1)*6-180+3)*D,l=lon*D;const s=Math.sin(p),c=Math.cos(p),t=Math.tan(p);
+ const N=a/Math.sqrt(1-e2*s*s),T=t*t,C=ep2*c*c,A=c*(l-l0);
+ const M=a*((1-e2/4-3*e4/64-5*e6/256)*p-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*p)+(15*e4/256+45*e6/1024)*Math.sin(4*p)-(35*e6/3072)*Math.sin(6*p));
+ return {E:k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000,N:k0*(M+N*t*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720))}}
+function inv(E,Nn,zone){const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));const mu=Nn/k0/(a*(1-e2/4-3*e4/64-5*e6/256));
+ const p1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu)+(1097*e1**4/512)*Math.sin(8*mu);
+ const s=Math.sin(p1),c=Math.cos(p1),t=Math.tan(p1);const N1=a/Math.sqrt(1-e2*s*s),T1=t*t,C1=ep2*c*c,R1=a*(1-e2)/Math.pow(1-e2*s*s,1.5),Dd=(E-500000)/(N1*k0);
+ const lat=p1-(N1*t/R1)*(Dd*Dd/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*Dd**4/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*Dd**6/720);
+ const lon=((zone-1)*6-180+3)*D+(Dd-(1+2*T1+C1)*Dd**3/6+(5-2*C1+28*T1-24*ep2+3*T1*T1+8*C1*C1)*Dd**5/120)/c;
+ return {lat:lat/D,lon:lon/D}}
+return {fwd,inv}})();
+
+const NV={cal:[],zone:30,decl:0,dest:null,start:null,startMode:'gps',type:'recta',route:null,stats:null};
+let T=null,pos=null,watchId=null,heading=null,wi=1,navTap=null,pendingCal=null;
+const fmt=(n,d=0)=>Number(n).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtD=m=>m>=1000?fmt(m/1000,m>=10000?1:2)+' km':fmt(Math.round(m))+' m';
+const num=s=>{const v=parseFloat(String(s).replace(/\s/g,'').replace(',','.'));return isFinite(v)?v:null};
+const n360=a=>((a%360)+360)%360;
+const dU=(a,b)=>Math.hypot(a.E-b.E,a.N-b.N);
+const brgGrid=(a,b)=>n360(Math.atan2(b.E-a.E,b.N-a.N)/DEG);
+function navMsg(t,ok){const m=$('#navMsg');m.textContent=t;m.className='navmsg'+(ok?' ok':'');m.hidden=!t;clearTimeout(m._t);if(t)m._t=setTimeout(()=>{m.hidden=true},9000)}
+
+/* calibración */
+function fit(){const P=NV.cal;T=null;if(P.length<2)return;
+  if(P.length===2){const z1={r:P[0].x,i:-P[0].y},z2={r:P[1].x,i:-P[1].y},w1={r:P[0].E,i:P[0].N},w2={r:P[1].E,i:P[1].N};
+    const dz={r:z2.r-z1.r,i:z2.i-z1.i},dw={r:w2.r-w1.r,i:w2.i-w1.i};const den=dz.r*dz.r+dz.i*dz.i;if(!den)return;
+    const A={r:(dw.r*dz.r+dw.i*dz.i)/den,i:(dw.i*dz.r-dw.r*dz.i)/den};const B={r:w1.r-(A.r*z1.r-A.i*z1.i),i:w1.i-(A.r*z1.i+A.i*z1.r)};
+    setAffine(A.r,A.i,B.r,A.i,-A.r,B.i)}
+  else{const ls=k=>{let m=[[0,0,0],[0,0,0],[0,0,0]],v=[0,0,0];for(const p of P){const r=[p.x,p.y,1];for(let i=0;i<3;i++){v[i]+=r[i]*p[k];for(let j=0;j<3;j++)m[i][j]+=r[i]*r[j]}}return solve3(m,v)};
+    const e=ls('E'),n=ls('N');if(!e||!n)return;setAffine(e[0],e[1],e[2],n[0],n[1],n[2])}
+  for(const p of NV.cal){const u=T.px2utm(p.x,p.y);p.res=Math.hypot(u.E-p.E,u.N-p.N)}}
+function det3(m){return m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0])}
+function solve3(m,v){const d=det3(m);if(Math.abs(d)<1e-9)return null;const r=[];for(let k=0;k<3;k++)r.push(det3(m.map((row,i)=>row.map((x,j)=>j===k?v[i]:x)))/d);return r}
+function setAffine(a,b,c,d,e,f){const det=a*e-b*d;T={a,b,c,d,e,f,px2utm:(x,y)=>({E:a*x+b*y+c,N:d*x+e*y+f}),utm2px:(E,N)=>{const X=E-c,Y=N-f;return {x:(e*X-b*Y)/det,y:(-d*X+a*Y)/det}},mpp:Math.sqrt(Math.abs(det))}}
+
+/* dibujo de navegación sobre la foto */
+const GREEN='#0E7A43';
+function drawNav(c,scale=1){if(!img)return;const L=LOVR||lw()*scale;c.save();c.lineCap='round';c.lineJoin='round';
+  const P=p=>({x:p.x*scale,y:p.y*scale});
+  const txt=(t,x,y,col)=>{c.font=`600 ${Math.round(L*5.5)}px "IBM Plex Mono", monospace`;c.textAlign='left';c.textBaseline='bottom';c.lineWidth=L*1.6;c.strokeStyle='#fff';c.strokeText(t,x,y);c.fillStyle=col;c.fillText(t,x,y)};
+  const crossAt=(p,t)=>{const q=P(p),r=L*4;for(const [w,col] of [[L*1.8,'#fff'],[L*0.8,'#7A1FA2']]){c.lineWidth=w;c.strokeStyle=col;c.beginPath();c.moveTo(q.x-r,q.y);c.lineTo(q.x+r,q.y);c.moveTo(q.x,q.y-r);c.lineTo(q.x,q.y+r);c.stroke()}txt(t,q.x+r*0.8,q.y-r*0.6,'#7A1FA2')};
+  for(const p of NV.cal)crossAt(p,`${fmt(p.E/1000,p.E%1000?1:0)} / ${fmt(p.N/1000,p.N%1000?1:0)}`);
+  if(pendingCal)crossAt(pendingCal,'?');
+  if(!T){c.restore();return}
+  const u2p=u=>P(T.utm2px(u.E,u.N));
+  if(NV.route&&NV.route.length>1){const pts=NV.route.map(u2p);const path=()=>{c.beginPath();c.moveTo(pts[0].x,pts[0].y);for(const q of pts)c.lineTo(q.x,q.y)};
+    path();c.lineWidth=L*2.6;c.strokeStyle='rgba(255,255,255,.9)';c.stroke();path();c.lineWidth=L*1.3;c.strokeStyle=GREEN;c.setLineDash([L*4,L*2.5]);c.stroke();c.setLineDash([]);
+    for(let i=1;i<pts.length-1;i++){c.fillStyle=i<wi?'#888':GREEN;c.beginPath();c.arc(pts[i].x,pts[i].y,L*1.3,0,7);c.fill()}}
+  if(NV.start&&NV.startMode==='map'){const q=u2p(NV.start);c.fillStyle='#fff';c.beginPath();c.arc(q.x,q.y,L*3,0,7);c.fill();c.fillStyle=GREEN;c.beginPath();c.arc(q.x,q.y,L*2,0,7);c.fill();txt('Salida',q.x+L*3,q.y-L*2,GREEN)}
+  if(NV.dest){const q=u2p(NV.dest),h=L*10;c.strokeStyle='#1C221D';c.lineWidth=L*0.9;c.beginPath();c.moveTo(q.x,q.y);c.lineTo(q.x,q.y-h);c.stroke();c.fillStyle='#D0141F';c.beginPath();c.moveTo(q.x,q.y-h);c.lineTo(q.x+h*0.65,q.y-h*0.78);c.lineTo(q.x,q.y-h*0.56);c.closePath();c.fill();txt('Destino',q.x+L*2,q.y-h-L,'#D0141F')}
+  if(pos){const q=u2p(pos);const r=Math.max(L*2.5,pos.acc/T.mpp*scale);c.fillStyle='rgba(11,95,214,.16)';c.beginPath();c.arc(q.x,q.y,r,0,7);c.fill();
+    if(heading!=null){const gb=headingToGrid(heading);const a=T.utm2px(pos.E,pos.N),b=T.utm2px(pos.E,pos.N+100);const up=Math.atan2(b.x-a.x,-(b.y-a.y));const ang=gb*DEG+up-Math.PI/2;c.fillStyle='rgba(11,95,214,.35)';c.beginPath();c.moveTo(q.x,q.y);c.arc(q.x,q.y,L*14,ang-0.35,ang+0.35);c.closePath();c.fill()}
+    c.fillStyle='#fff';c.beginPath();c.arc(q.x,q.y,L*3.2,0,7);c.fill();c.fillStyle='#0B5FD6';c.beginPath();c.arc(q.x,q.y,L*2.2,0,7);c.fill();txt('Tú',q.x+L*3.5,q.y-L*2,'#0B5FD6')}
+  c.restore()}
+
+function navTapAt(p){if(p.x<0||p.y<0||p.x>cv.width||p.y>cv.height)return;
+  if(navTap==='cal'){pendingCal=p;$('#calForm').hidden=false;$('#cE').focus();render();return}
+  if(!T)return;const u=T.px2utm(p.x,p.y);
+  if(navTap==='dest'){NV.dest=u;navMsg('Destino marcado.',true)}else if(navTap==='start'){NV.start=u;navMsg('Salida marcada.',true)}
+  setNavTap(null);NV.route=null;NV.stats=null;saveSoon();refreshNav();render()}
+function setNavTap(m){navTap=m;cv.style.touchAction=m?'none':(tool==='pan'?'pan-x pan-y pinch-zoom':'none');cv.style.cursor=m?'copy':'';
+  $('#calMode').setAttribute('aria-pressed',m==='cal');$('#destMode').setAttribute('aria-pressed',m==='dest');$('#startMode').setAttribute('aria-pressed',m==='start');
+  if(m==='cal')navMsg('Toca en el mapa un cruce de la cuadrícula. Amplía con + para acertar.',true);
+  if(m==='dest')navMsg('Toca en el mapa el punto de destino.',true);if(m==='start')navMsg('Toca en el mapa el punto de salida.',true)}
+
+function refreshNav(){
+  const L=$('#calList');
+  if(!NV.cal.length)L.innerHTML='<p class="note">Sin cruces todavía.</p>';
+  else{L.innerHTML='<table><tr><th>#</th><th>X km</th><th>Y km</th><th>Error</th><th></th></tr>'+NV.cal.map((p,i)=>`<tr><td>${i+1}</td><td class="m">${fmt(p.E/1000,3)}</td><td class="m">${fmt(p.N/1000,3)}</td><td class="m">${NV.cal.length>2&&p.res!=null?fmt(p.res)+' m':'—'}</td><td><button data-del="${i}" class="mini">Quitar</button></td></tr>`).join('')+'</table>'+
+    (T?`<p class="note">Calibrada. 1 píxel de la foto ≈ ${fmt(T.mpp,1)} m.${NV.cal.length>2?' Si un cruce tiene mucho más error que los demás, quítalo y márcalo otra vez.':' Un tercer cruce corrige mejor la perspectiva de la foto.'}</p>`:'<p class="note">Falta al menos un cruce más.</p>');
+    L.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{NV.cal.splice(+b.dataset.del,1);fit();NV.route=null;saveSoon();refreshNav();render()})}
+  document.querySelectorAll('.needT').forEach(el=>el.classList.toggle('dis',!T));
+  segSet('#startSeg',NV.startMode);segSet('#typeSeg',NV.type);$('#startMode').hidden=NV.startMode!=='map';
+  // destino desde marcas
+  const ds=$('#destSel');const opts=[['','Elegir un punto marcado…']].concat(marks.filter(m=>m.t==='point').map((m,i)=>['m'+marks.indexOf(m),'Punto '+m.label+' (rojo)']),aiMarks.map((m,i)=>m.t==='pt'?['a'+i,(m.label||'Punto')+' (IA)']:null).filter(Boolean));
+  ds.innerHTML=opts.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+  // líneas disponibles para ruta
+  const ls=$('#lineSel');const lines=[];aiMarks.forEach((m,i)=>{if(m.t==='pl'&&!m.closed)lines.push(['a'+i,(m.label||'Línea')+' (IA, azul)'])});marks.forEach((m,i)=>{if(m.t==='free')lines.push(['m'+i,m.label+' (tuyo, rojo)'])});
+  const prev=ls.value;ls.innerHTML=lines.length?lines.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join(''):'<option value="">No hay líneas dibujadas</option>';if(lines.some(l=>l[0]===prev))ls.value=prev;
+  $('#lineRow').hidden=NV.type!=='linea';
+  $('#typeHint').textContent={recta:'Línea recta de la salida al destino: la más corta, sin mirar el relieve.',pend:'Evita las cuestas con un modelo de elevación real (Copernicus 90 m). Necesita cobertura para calcularla.',linea:'Usa una línea dibujada en el mapa: la que trazó la IA (por ejemplo «Mínima pendiente A→B») o un trazo tuyo.'}[NV.type];
+  renderRoute();renderGuide()}
+function segSet(sel,v){document.querySelectorAll(sel+' button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v))}
+
+/* GPS */
+function startGPS(){if(!navigator.geolocation){navMsg('Este navegador no tiene GPS.');return}if(watchId!=null)return;$('#gpsState').textContent='Buscando señal…';
+  watchId=navigator.geolocation.watchPosition(updatePos,err=>{$('#gpsState').textContent=err.code===1?'Permiso de ubicación denegado: actívalo en los ajustes del navegador.':'Sin señal GPS todavía.';watchId=null},{enableHighAccuracy:true,maximumAge:2000,timeout:30000})}
+function updatePos(p){const c=p.coords;const u=UTM.fwd(c.latitude,c.longitude,NV.zone);pos={E:u.E,N:u.N,acc:c.accuracy,raw:p};
+  let out='';if(T){const q=T.utm2px(u.E,u.N);if(q.x<0||q.y<0||q.x>cv.width||q.y>cv.height)out=' Estás fuera de la zona de la foto.'}
+  $('#gpsState').textContent=`±${fmt(c.accuracy)} m · X ${fmt(u.E/1000,3)} Y ${fmt(u.N/1000,3)}.${out}`;
+  advance();render();renderGuide();arUpdate()}
+
+/* rutas */
+function startPoint(){return NV.startMode==='gps'?(pos?{E:pos.E,N:pos.N}:null):NV.start}
+const pathLen=p=>p.slice(1).reduce((s,q,i)=>s+dU(p[i],q),0);
+function rdp(pts,eps){if(pts.length<3)return pts;const a=pts[0],b=pts[pts.length-1];let mx=0,ix=0;const Ln=dU(a,b)||1;
+  for(let i=1;i<pts.length-1;i++){const p=pts[i];const d=Math.abs((b.E-a.E)*(a.N-p.N)-(a.E-p.E)*(b.N-a.N))/Ln;if(d>mx){mx=d;ix=i}}
+  return mx>eps?rdp(pts.slice(0,ix+1),eps).slice(0,-1).concat(rdp(pts.slice(ix),eps)):[a,b]}
+function along(r,s){for(let i=1;i<r.length;i++){const d=dU(r[i-1],r[i]);if(s<=d||i===r.length-1){const t=d?Math.min(1,s/d):0;return {E:r[i-1].E+(r[i].E-r[i-1].E)*t,N:r[i-1].N+(r[i].N-r[i-1].N)*t}}s-=d}return r[r.length-1]}
+async function elevations(us){const out=[];for(let i=0;i<us.length;i+=100){const ch=us.slice(i,i+100).map(u=>UTM.inv(u.E,u.N,NV.zone));
+  const r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${ch.map(c=>c.lat.toFixed(5)).join(',')}&longitude=${ch.map(c=>c.lon.toFixed(5)).join(',')}`);
+  if(!r.ok)throw new Error('el servicio de elevación no responde ('+r.status+')');const j=await r.json();if(!j.elevation)throw new Error('respuesta de elevación vacía');out.push(...j.elevation);
+  if(i+100<us.length)await new Promise(r=>setTimeout(r,120))}return out}
+async function profileStats(route){const Ln=pathLen(route);const n=Math.min(100,Math.max(10,Math.round(Ln/40)));const s=[];for(let k=0;k<=n;k++)s.push(along(route,Ln*k/n));
+  const h=await elevations(s);let up=0,down=0,mx=0;const st=Ln/n;for(let k=1;k<h.length;k++){const d=h[k]-h[k-1];if(d>0)up+=d;else down-=d;mx=Math.max(mx,Math.abs(d)/st)}return {len:Ln,up,down,max:mx}}
+async function minSlope(a,b){const out=$('#routeOut');const D=dU(a,b),pad=Math.max(400,D*0.4);
+  const E0=Math.min(a.E,b.E)-pad,E1=Math.max(a.E,b.E)+pad,N0=Math.min(a.N,b.N)-pad,N1=Math.max(a.N,b.N)+pad;
+  const cell=Math.max(60,Math.max(E1-E0,N1-N0)/44);const nx=Math.ceil((E1-E0)/cell)+1,ny=Math.ceil((N1-N0)/cell)+1;if(nx*ny>2600)throw new Error('la zona es demasiado grande; acerca la salida y el destino');
+  const nodes=[];for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)nodes.push({E:E0+i*cell,N:N0+j*cell});
+  out.innerHTML=`<p class="note">Descargando el relieve (${nodes.length} puntos)…</p>`;const H=await elevations(nodes);out.innerHTML='<p class="note">Buscando el camino con menos cuesta…</p>';
+  const id=(i,j)=>j*nx+i;const s0=id(Math.round((a.E-E0)/cell),Math.round((a.N-N0)/cell)),t0=id(Math.round((b.E-E0)/cell),Math.round((b.N-N0)/cell));
+  const nb=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1],[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+  const Nn=nx*ny,g=new Float64Array(Nn).fill(Infinity),prev=new Int32Array(Nn).fill(-1),done=new Uint8Array(Nn),heap=[];
+  const push=(k,c)=>{heap.push([c,k]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m}}return top};
+  g[s0]=0;push(s0,0);
+  while(heap.length){const [c,k]=pop();if(done[k])continue;done[k]=1;if(k===t0)break;const i=k%nx,j=(k/nx)|0;
+    for(const [di,dj] of nb){const ii=i+di,jj=j+dj;if(ii<0||jj<0||ii>=nx||jj>=ny)continue;const k2=id(ii,jj);if(done[k2])continue;const d=Math.hypot(di,dj)*cell;const s=Math.abs(H[k2]-H[k])/d;const nc=c+d*(1+Math.pow(s/0.06,2));if(nc<g[k2]){g[k2]=nc;prev[k2]=k;push(k2,nc)}}}
+  if(prev[t0]<0&&t0!==s0)throw new Error('no se encontró camino');
+  const path=[];for(let k=t0;k>=0;k=prev[k]){path.push(nodes[k]);if(k===s0)break}path.reverse();
+  return rdp([a,...path.slice(1,-1),b],cell*0.35)}
+function lineFromSel(){const v=$('#lineSel').value;if(!v)return null;const m=v[0]==='a'?aiMarks[+v.slice(1)]:marks[+v.slice(1)];if(!m)return null;const pts=m.pts||[m.a,m.b];return pts.map(p=>T.px2utm(p.x,p.y))}
+async function calcRoute(){
+  if(!T){navMsg('Primero calibra la foto (paso 1).');return}
+  const st=startPoint();const btn=$('#calc');
+  if(NV.type==='linea'){let L=lineFromSel();if(!L||L.length<2){navMsg('No hay ninguna línea dibujada. Pide a la IA que trace la ruta (pestaña Preguntar) o dibuja un trazo.');return}
+    if(st&&dU(st,L[L.length-1])<dU(st,L[0]))L=L.slice().reverse();
+    if(st&&dU(st,L[0])>25)L=[st,...L];NV.dest=L[L.length-1];NV.route=rdp(L,T.mpp*2)}
+  else{if(!NV.dest){navMsg('Marca el destino (paso 2).');return}
+    if(!st){navMsg(NV.startMode==='gps'?'Activa el GPS y espera señal, o elige «Punto en el mapa» como salida.':'Marca la salida en el mapa.');return}
+    btn.disabled=true;try{NV.route=NV.type==='recta'?[st,NV.dest]:await minSlope(st,NV.dest)}catch(e){$('#routeOut').innerHTML=`<div class="navmsg">No se ha podido calcular: ${esc(e.message||String(e))}. Comprueba la cobertura.</div>`;btn.disabled=false;return}btn.disabled=false}
+  wi=1;NV.stats={len:pathLen(NV.route)};render();refreshNav();saveSoon();
+  $('#routeOut').insertAdjacentHTML('beforeend','<p class="note">Calculando desnivel…</p>');
+  try{NV.stats=await profileStats(NV.route);if(NV.type==='pend'){NV.stats.cmp=await profileStats([NV.route[0],NV.route[NV.route.length-1]]).catch(()=>null)}}catch(e){}
+  saveSoon();renderRoute()}
+function renderRoute(){const o=$('#routeOut');const st=NV.stats;$('#goGuide').hidden=!NV.route;if(!NV.route||!st){o.innerHTML='';return}
+  const gb=brgGrid(NV.route[0],NV.route[1]);
+  o.innerHTML=`<div class="stats"><div class="stat"><small>Longitud</small><b>${fmtD(st.len)}</b></div>
+   ${st.up!=null?`<div class="stat"><small>Subida</small><b>${fmt(st.up)} m</b></div><div class="stat"><small>Bajada</small><b>${fmt(st.down)} m</b></div><div class="stat"><small>Pendiente máx.</small><b>${fmt(st.max*100)} %</b></div>`:''}
+   <div class="stat"><small>Rumbo de salida</small><b>${fmt(magOf(gb,NV.route[0]))}°</b></div><div class="stat"><small>Tramos</small><b>${NV.route.length-1}</b></div></div>
+   ${st.cmp?`<p class="note">En línea recta: ${fmtD(st.cmp.len)}, ${fmt(st.cmp.up)} m de subida y pendiente máxima del ${fmt(st.cmp.max*100)} %.</p>`:''}
+   ${st.up!=null?'<p class="note">Desniveles del modelo Copernicus de 90 m: orientativos.</p>':''}`}
+
+/* rumbos */
+function convergence(u){const ll=UTM.inv(u.E,u.N,NV.zone);const l0=(NV.zone-1)*6-180+3;return Math.atan(Math.tan((ll.lon-l0)*DEG)*Math.sin(ll.lat*DEG))/DEG}
+function magOf(g,at){return n360(g+convergence(at)-NV.decl)}
+function headingToGrid(h){const at=pos||(NV.route&&NV.route[0])||{E:T.c,N:T.f};return n360(h+NV.decl-convergence(at))}
+
+/* guiado */
+function advance(){if(!NV.route||!pos)return;const R=NV.route;const reach=Math.max(12,Math.min(35,pos.acc*0.8));if(wi<1)wi=1;
+  while(wi<R.length-1&&dU(pos,R[wi])<reach)wi++;for(let j=R.length-1;j>wi;j--){if(dU(pos,R[j])<dU(pos,R[wi])&&dU(pos,R[j])<60){wi=j;break}}}
+function renderGuide(){const g=$('#guideInfo');if(!NV.route){g.innerHTML='<p class="note">Calcula una ruta en el paso 3.</p>';return}
+  if(!pos){g.innerHTML='<p class="note">Activa el GPS (paso 2) para que te guíe.</p>';return}
+  const t=NV.route[Math.min(wi,NV.route.length-1)];const d=dU(pos,t),rest=d+pathLen(NV.route.slice(wi));const gb=brgGrid(pos,t),mb=magOf(gb,pos);
+  g.innerHTML=`<div class="stats"><div class="stat"><small>Siguiente punto</small><b>${fmtD(d)}</b></div><div class="stat"><small>Al destino</small><b>${fmtD(rest)}</b></div><div class="stat"><small>Rumbo magnético</small><b>${fmt(mb)}°</b></div><div class="stat"><small>Milésimas</small><b>${fmt(mb*6400/360)}</b></div></div><p class="note">Punto ${wi} de ${NV.route.length-1} · acimut de cuadrícula ${fmt(gb)}°.</p>`}
+let oriOn=false,hs=null;
+async function startCompass(){try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted'){navMsg('Sin permiso para la brújula.');return}}}catch(e){}
+  if(oriOn)return;oriOn=true;if('ondeviceorientationabsolute' in window)window.addEventListener('deviceorientationabsolute',onOri);else window.addEventListener('deviceorientation',onOri)}
+function onOri(e){let h=null;if(typeof e.webkitCompassHeading==='number'&&!isNaN(e.webkitCompassHeading))h=e.webkitCompassHeading;else if((e.absolute||e.type==='deviceorientationabsolute')&&e.alpha!=null)h=eulerHeading(e.alpha,e.beta||0,e.gamma||0);
+  if(h==null)return;h=n360(h+((screen.orientation&&screen.orientation.angle)||window.orientation||0));
+  if(hs==null)hs={s:Math.sin(h*DEG),c:Math.cos(h*DEG)};else{hs.s=hs.s*0.75+Math.sin(h*DEG)*0.25;hs.c=hs.c*0.75+Math.cos(h*DEG)*0.25}
+  heading=n360(Math.atan2(hs.s,hs.c)/DEG);arUpdate();if(!$('#tabNav').hidden)renderSoon()}
+let rs=0;function renderSoon(){if(rs)return;rs=requestAnimationFrame(()=>{rs=0;render()})}
+function eulerHeading(a,b,g){const A=a*DEG,B=b*DEG,G=g*DEG;const sA=Math.sin(A),cA=Math.cos(A),sB=Math.sin(B),cB=Math.cos(B),sG=Math.sin(G),cG=Math.cos(G);
+  let e=-(cG*sA*sB+cA*sG),n=-(sA*sG-cA*cG*sB);if(Math.hypot(e,n)<0.35){e=-cB*sA;n=cA*cB}return n360(Math.atan2(e,n)/DEG)}
+let stream=null,lastVib=0;
+async function openAR(){if(!NV.route){navMsg('Primero calcula una ruta.');return}startGPS();await startCompass();$('#ar').hidden=false;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('#vid').srcObject=stream;$('#vid').hidden=false}catch(e){$('#vid').hidden=true}
+  try{if('wakeLock' in navigator)window._wl=await navigator.wakeLock.request('screen')}catch(e){}arUpdate()}
+function closeAR(){$('#ar').hidden=true;$('#arrived').hidden=true;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}try{window._wl&&window._wl.release()}catch(e){}}
+function arUpdate(){if($('#ar').hidden||!NV.route)return;if(!pos){$('#arDist').textContent='—';$('#arSub').textContent='Esperando GPS…';return}
+  const R=NV.route,last=R.length-1,t=R[Math.min(wi,last)],d=dU(pos,t);
+  if(wi>=last&&d<Math.max(10,Math.min(30,pos.acc))){if($('#arrived').hidden&&navigator.vibrate)navigator.vibrate([200,100,200]);$('#arrived').hidden=false;return}
+  const gb=brgGrid(pos,t),mb=magOf(gb,pos);
+  $('#arDist').textContent=fmtD(d);$('#arSub').textContent=`Punto ${wi} de ${last} · al destino ${fmtD(d+pathLen(R.slice(wi)))}`;
+  $('#arBrg').textContent=fmt(mb)+'° · '+fmt(mb*6400/360)+' mil';$('#arAcc').textContent=`GPS ±${fmt(pos.acc)} m`;
+  if(heading==null){$('#arHead').textContent='sin brújula';$('#arTurn').textContent='Orienta a '+fmt(mb)+'°';$('#arrow').style.transform='translate(-50%,-50%)'}
+  else{const rel=((mb-heading+540)%360)-180;$('#arHead').textContent=fmt(heading)+'°';$('#arrow').style.transform=`translate(-50%,-50%) rotate(${rel}deg)`;
+    const ok=Math.abs(rel)<12;$('#arrowPath').setAttribute('fill',ok?'#1D9A55':'#0B5FD6');
+    $('#arTurn').textContent=ok?'Sigue recto':rel>0?`Gira ${fmt(Math.abs(rel))}° a la derecha`:`Gira ${fmt(Math.abs(rel))}° a la izquierda`;
+    const tg=$('#target');if(Math.abs(rel)<30){tg.hidden=false;tg.style.left=(50+rel/30*45)+'%';$('#targetLbl').textContent=(wi>=last?'Destino':'Punto '+wi)+' · '+fmtD(d)}else tg.hidden=true;
+    if(ok&&navigator.vibrate&&Date.now()-lastVib>6000){navigator.vibrate(60);lastVib=Date.now()}}
+  mini()}
+function mini(){const c=$('#miniMap'),g=c.getContext('2d'),W=c.width;g.fillStyle='#222';g.fillRect(0,0,W,W);if(!img||!T||!pos)return;
+  const p=T.utm2px(pos.E,pos.N);const s=W/(400/T.mpp);g.save();g.translate(W/2,W/2);g.scale(s,s);g.translate(-p.x,-p.y);g.drawImage(img,0,0);
+  g.lineWidth=4/s;g.strokeStyle=GREEN;g.beginPath();NV.route.forEach((u,i)=>{const q=T.utm2px(u.E,u.N);i?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)});g.stroke();g.restore();
+  g.fillStyle='#fff';g.beginPath();g.arc(W/2,W/2,9,0,7);g.fill();g.fillStyle='#0B5FD6';g.beginPath();g.arc(W/2,W/2,6,0,7);g.fill()}
+
+function gpsText(){if(!T)return '';let s=`\n\nLa foto está calibrada con la cuadrícula UTM (huso ${NV.zone}).`;
+  if(pos){const q=T.utm2px(pos.E,pos.N);s+=` Posición GPS actual del usuario: X ${Math.round(pos.E)} m, Y ${Math.round(pos.N)} m (±${Math.round(pos.acc)} m); en la foto está en (x ${(q.x/cv.width*100).toFixed(1)}, y ${(q.y/cv.height*100).toFixed(1)}), marcada como "Tú".`}
+  if(NV.dest){const q=T.utm2px(NV.dest.E,NV.dest.N);s+=` Destino elegido en (x ${(q.x/cv.width*100).toFixed(1)}, y ${(q.y/cv.height*100).toFixed(1)}).`}return s}
+
+/* eventos de navegación */
+function wireNav(){
+  $('#zone').onchange=e=>{NV.zone=+e.target.value;saveSoon();if(pos)updatePos(pos.raw)};
+  $('#decl').onchange=e=>{const v=num(e.target.value);NV.decl=v==null?0:v;saveSoon();refreshNav()};
+  $('#calMode').onclick=()=>setNavTap(navTap==='cal'?null:'cal');
+  $('#calSave').onclick=()=>{let E=num($('#cE').value),N=num($('#cN').value);if(E==null||N==null||!pendingCal){navMsg('Escribe los dos números del cruce.');return}
+    if(E<1000)E*=1000;if(N<10000)N*=1000;if(E<100000||E>900000||N<3000000||N>5000000){navMsg('Esos números no parecen UTM de España: X tiene 3 cifras en km (p. ej. 445) e Y 4 cifras (p. ej. 4472).');return}
+    NV.cal.push({x:pendingCal.x,y:pendingCal.y,E,N});pendingCal=null;$('#calForm').hidden=true;$('#cE').value='';$('#cN').value='';fit();NV.route=null;saveSoon();refreshNav();render();
+    if(NV.cal.length<2)navMsg('Bien. Toca otro cruce, lo más lejos posible del primero.',true);else{setNavTap(null);navMsg(NV.cal.length<3?'Calibrada. Un tercer cruce mejora la precisión (pulsa «Marcar cruce»).':'Calibrada.',true)}};
+  $('#calCancel').onclick=()=>{pendingCal=null;$('#calForm').hidden=true;render()};
+  $('#gpsOn').onclick=startGPS;
+  document.querySelectorAll('#startSeg button').forEach(b=>b.onclick=()=>{NV.startMode=b.dataset.v;NV.route=null;saveSoon();refreshNav();render()});
+  document.querySelectorAll('#typeSeg button').forEach(b=>b.onclick=()=>{NV.type=b.dataset.v;NV.route=null;NV.stats=null;saveSoon();refreshNav();render()});
+  $('#destMode').onclick=()=>{if(!T){navMsg('Primero calibra la foto.');return}setNavTap(navTap==='dest'?null:'dest')};
+  $('#startMode').onclick=()=>{if(!T){navMsg('Primero calibra la foto.');return}setNavTap(navTap==='start'?null:'start')};
+  $('#destSel').onchange=e=>{const v=e.target.value;if(!v||!T)return;const m=v[0]==='m'?marks[+v.slice(1)]:aiMarks[+v.slice(1)];if(!m)return;NV.dest=T.px2utm(m.x,m.y);NV.route=null;saveSoon();refreshNav();render();navMsg('Destino: '+(m.label||'punto'),true)};
+  $('#calc').onclick=calcRoute;$('#goGuide').onclick=()=>$('#guideBox').scrollIntoView({behavior:'smooth'});
+  $('#arStart').onclick=openAR;$('#arClose').onclick=closeAR;$('#arrivedOk').onclick=closeAR;
+  $('#zone').value=String(NV.zone);$('#decl').value=String(NV.decl)}
+
+
+/* ---------- carga de imagen ---------- */
+function loadImageFromURL(url){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url})}
+async function setImage(i,restore){
+  const MAX=2600;let w=i.naturalWidth,h=i.naturalHeight;const s=Math.min(1,MAX/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(i,0,0,w,h);img=c;
+  cv.width=w;cv.height=h;zoom=1;applyZoom();$('#emptyBox').hidden=true;$('#mapBox').hidden=false;resetChat();
+  if(restore){photoURL=restore.photo;marks=restore.marks||[];aiMarks=restore.aiMarks||[];Object.assign(NV,restore.nv||{});const sh=restore.sheet||{};for(const k in sh){const el=$('#'+k);if(el)el.value=sh[k]}}
+  else{photoURL=c.toDataURL('image/jpeg',0.82);marks=[];aiMarks=[];NV.cal=[];NV.dest=null;NV.start=null;NV.route=null;NV.stats=null}
+  pendingCal=null;fit();wi=1;$('#zone').value=String(NV.zone);$('#decl').value=String(NV.decl);render();refreshNav();saveAll();
+}
+async function onFile(f){if(!f||!f.type.startsWith('image/'))return;const url=URL.createObjectURL(f);try{await setImage(await loadImageFromURL(url))}catch(e){alertMsg('No se ha podido abrir esa imagen. Prueba con una foto JPG o PNG.')}finally{URL.revokeObjectURL(url)}}
+$('#file').addEventListener('change',e=>onFile(e.target.files[0]));
+$('#file2').addEventListener('change',e=>{onFile(e.target.files[0]);e.target.value=''});
+const eb=$('#emptyBox');
+eb.addEventListener('dragover',e=>{e.preventDefault();eb.classList.add('drag')});
+eb.addEventListener('dragleave',()=>eb.classList.remove('drag'));
+eb.addEventListener('drop',e=>{e.preventDefault();eb.classList.remove('drag');onFile(e.dataTransfer.files[0])});
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it)onFile(it.getAsFile())});
+$('#btnDemo').addEventListener('click',async()=>{await setImage(await loadImageFromURL(demoMap()));$('#dEsc').value='1:50.000';$('#dEq').value='20 m'});
+
+/* ---------- dibujo ---------- */
+function lw(){const w=cv.getBoundingClientRect().width/zoom;const r=w>0?cv.width/w:1;return Math.max(2,Math.min(r*2.6,Math.max(cv.width,cv.height)/250))}
+function drawMarks(c,list,scale=1){
+  const L=LOVR||lw()*scale;c.save();c.lineCap='round';c.lineJoin='round';
+  for(const m of list){
+    c.strokeStyle=RED;c.fillStyle=RED;
+    if(m.t==='point'){const r=L*3.2;c.lineWidth=L*1.6;c.strokeStyle='rgba(255,255,255,.9)';c.beginPath();c.arc(m.x*scale,m.y*scale,r,0,7);c.stroke();c.lineWidth=L*0.9;c.strokeStyle=RED;c.beginPath();c.arc(m.x*scale,m.y*scale,r,0,7);c.stroke();c.beginPath();c.arc(m.x*scale,m.y*scale,L*0.7,0,7);c.fill();label(c,m.label,m.x*scale+r*0.9,m.y*scale-r*0.9,L)}
+    else if(m.t==='line'){c.lineWidth=L*1.1;c.beginPath();c.moveTo(m.a.x*scale,m.a.y*scale);c.lineTo(m.b.x*scale,m.b.y*scale);c.stroke();for(const p of [m.a,m.b]){c.beginPath();c.arc(p.x*scale,p.y*scale,L*1.2,0,7);c.fill()}label(c,m.label,(m.a.x+m.b.x)/2*scale+L*2,(m.a.y+m.b.y)/2*scale-L*2,L*0.8)}
+    else if(m.t==='free'&&m.pts.length>1){c.lineWidth=L*0.9;c.beginPath();c.moveTo(m.pts[0].x*scale,m.pts[0].y*scale);for(const p of m.pts)c.lineTo(p.x*scale,p.y*scale);c.stroke();const e=m.pts[m.pts.length-1];label(c,m.label,e.x*scale+L*2,e.y*scale,L*0.8)}
+  }c.restore()}
+function label(c,t,x,y,L){c.font=`700 ${Math.round(L*7)}px "Barlow Condensed", Arial, sans-serif`;c.textAlign='left';c.textBaseline='bottom';c.lineWidth=L*1.8;c.strokeStyle='#fff';c.strokeText(t,x,y);c.fillStyle=RED;c.fillText(t,x,y)}
+const BLUE='#0B5FD6';let LOVR=0;
+function drawAI(c,list,scale=1){if(!list.length)return;const L=LOVR||lw()*scale;c.save();c.lineCap='round';c.lineJoin='round';
+  const lbl=(t,x,y,k)=>{if(!t)return;c.font=`700 ${Math.round(L*6*k)}px "Barlow Condensed", Arial, sans-serif`;c.textAlign='left';c.textBaseline='bottom';c.lineWidth=L*1.8;c.strokeStyle='#fff';c.strokeText(t,x,y);c.fillStyle=BLUE;c.fillText(t,x,y)};
+  for(const m of list){
+    if(m.t==='pt'){const x=m.x*scale,y=m.y*scale,r=L*3;c.lineWidth=L*1.6;c.strokeStyle='#fff';c.beginPath();c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath();c.stroke();c.fillStyle=BLUE;c.fill();lbl(m.label,x+r*1.1,y-r*0.6,1)}
+    else if(m.pts&&m.pts.length>1){const path=()=>{c.beginPath();c.moveTo(m.pts[0].x*scale,m.pts[0].y*scale);for(const p of m.pts)c.lineTo(p.x*scale,p.y*scale);if(m.closed)c.closePath()};
+      if(m.closed){path();c.fillStyle='rgba(11,95,214,.15)';c.fill()}
+      path();c.lineWidth=L*2.2;c.strokeStyle='rgba(255,255,255,.85)';c.stroke();path();c.lineWidth=L*1.1;c.strokeStyle=BLUE;c.stroke();
+      if(!m.closed){const a=m.pts[m.pts.length-2],b=m.pts[m.pts.length-1];const ang=Math.atan2(b.y-a.y,b.x-a.x),h=L*4;c.fillStyle=BLUE;c.beginPath();c.moveTo(b.x*scale,b.y*scale);c.lineTo(b.x*scale-h*Math.cos(ang-0.45),b.y*scale-h*Math.sin(ang-0.45));c.lineTo(b.x*scale-h*Math.cos(ang+0.45),b.y*scale-h*Math.sin(ang+0.45));c.closePath();c.fill()}
+      const mid=m.pts[Math.floor(m.pts.length/2)];lbl(m.label,mid.x*scale+L*2.5,mid.y*scale-L*2,0.85)}
+  }c.restore()}
+function render(){if(!img)return;ctx.clearRect(0,0,cv.width,cv.height);ctx.drawImage(img,0,0);drawAI(ctx,aiMarks);drawMarks(ctx,drawing?marks.concat([drawing]):marks);drawNav(ctx);listMarks();saveSoon();
+  $('#clearAI').hidden=!aiMarks.length;const ai=$('#aiInfo');ai.hidden=!aiMarks.length;ai.innerHTML=aiMarks.length?'<span class="aitag">Dibujo de la IA (azul):</span> '+aiMarks.map(m=>esc(m.label||(m.t==='pt'?'punto':'línea'))).join(' · ')+'. Es aproximado: compruébalo con las curvas.':''}
+function listMarks(){const el=$('#marks');if(!marks.length){el.innerHTML='Sin marcas. Elige Punto, Línea o Trazo y toca el mapa.';return}
+  el.innerHTML='Marcas: '+marks.map(m=>`<b>${m.label}</b>`).join(' · ')}
+function nextPointLabel(){const used=new Set(marks.filter(m=>m.t==='point').map(m=>m.label));for(let k=0;k<26;k++){const l=String.fromCharCode(65+k);if(!used.has(l))return l}return 'P'+marks.length}
+const nextN=t=>marks.filter(m=>m.t===t).length+1;
+function evPt(e){const r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width*cv.width,y:(e.clientY-r.top)/r.height*cv.height}}
+cv.addEventListener('pointerdown',e=>{if(navTap&&img){e.preventDefault();navTapAt(evPt(e));return}if(!img||tool==='pan')return;e.preventDefault();cv.setPointerCapture(e.pointerId);const p=evPt(e);
+  if(tool==='point'){marks.push({t:'point',x:p.x,y:p.y,label:nextPointLabel()});render();return}
+  if(tool==='line')drawing={t:'line',a:p,b:p,label:'línea '+nextN('line')};
+  if(tool==='free')drawing={t:'free',pts:[p],label:'trazo '+nextN('free')};render()});
+cv.addEventListener('pointermove',e=>{if(!drawing)return;const p=evPt(e);if(drawing.t==='line')drawing.b=p;else drawing.pts.push(p);render()});
+cv.addEventListener('pointerup',()=>{if(!drawing)return;const d=drawing;drawing=null;
+  const ok=d.t==='line'?Math.hypot(d.a.x-d.b.x,d.a.y-d.b.y)>lw()*4:d.pts.length>3;if(ok)marks.push(d);render()});
+cv.addEventListener('pointercancel',()=>{drawing=null;render()});
+function setTool(t){tool=t;if(typeof setNavTap==='function'&&navTap)setNavTap(null);document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));cv.style.touchAction=t==='pan'?'pan-x pan-y pinch-zoom':'none';cv.style.cursor=t==='pan'?'grab':'crosshair'}
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));setTool('point');
+function applyZoom(){cv.style.width=(zoom*100)+'%'}
+$('#zIn').addEventListener('click',()=>{zoom=Math.min(4,zoom+0.5);applyZoom()});
+$('#zOut').addEventListener('click',()=>{zoom=Math.max(1,zoom-0.5);applyZoom()});
+$('#undo').addEventListener('click',()=>{marks.pop();render()});
+$('#clear').addEventListener('click',()=>{marks=[];render();refreshNav()});
+$('#clearAI').addEventListener('click',()=>{aiMarks=[];render();refreshNav()});
+
+/* ---------- imágenes para la IA ---------- */
+function toBlob(c,q=0.88){return new Promise(r=>c.toBlob(r,'image/jpeg',q))}
+async function regionImage(x0,y0,x1,y1,maxSide){
+  const W=cv.width,H=cv.height,cw=x1-x0,ch=y1-y0;const s=Math.min(maxSide/Math.max(cw,ch),3);const iw=Math.round(cw*s),ih=Math.round(ch*s);const M=Math.round(Math.max(iw,ih)*0.045);
+  const c=document.createElement('canvas');c.width=iw+2*M;c.height=ih+2*M;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+  g.drawImage(img,x0,y0,cw,ch,M,M,iw,ih);g.save();g.beginPath();g.rect(M,M,iw,ih);g.clip();g.translate(M-x0*s,M-y0*s);LOVR=Math.max(1.5,Math.max(iw,ih)/600);try{drawAI(g,aiMarks,s);drawMarks(g,marks,s);drawNav(g,s)}finally{LOVR=0}g.restore();
+  g.strokeStyle='#000';g.lineWidth=1;g.strokeRect(M,M,iw,ih);
+  const px0=x0/W*100,px1=x1/W*100,py0=y0/H*100,py1=y1/H*100;const span=Math.max(px1-px0,py1-py0);
+  const step=span>60?10:span>25?5:span>12?2:1;const minor=step>=5?step/5:step/2;
+  g.fillStyle='#000';g.strokeStyle='#000';g.font=`600 ${Math.round(M*0.42)}px Arial, sans-serif`;
+  const fix=v=>Math.round(v*1000)/1000;
+  for(let v=Math.ceil(px0/minor)*minor;v<=px1+1e-9;v+=minor){v=fix(v);const X=M+(v/100*W-x0)*s;const maj=Math.abs(v/step-Math.round(v/step))<1e-6;const t=maj?M*0.45:M*0.22;
+    g.beginPath();g.moveTo(X,M);g.lineTo(X,M-t);g.moveTo(X,M+ih);g.lineTo(X,M+ih+t);g.stroke();
+    if(maj){g.textAlign='center';g.textBaseline='bottom';g.fillText(String(v),X,M-t-1);g.textBaseline='top';g.fillText(String(v),X,M+ih+t+1)}}
+  for(let v=Math.ceil(py0/minor)*minor;v<=py1+1e-9;v+=minor){v=fix(v);const Y=M+(v/100*H-y0)*s;const maj=Math.abs(v/step-Math.round(v/step))<1e-6;const t=maj?M*0.45:M*0.22;
+    g.beginPath();g.moveTo(M,Y);g.lineTo(M-t,Y);g.moveTo(M+iw,Y);g.lineTo(M+iw+t,Y);g.stroke();
+    if(maj){g.textBaseline='middle';g.textAlign='right';g.fillText(String(v),M-t-2,Y);g.textAlign='left';g.fillText(String(v),M+iw+t+2,Y)}}
+  return toBlob(c)}
+async function buildImages(max){
+  const W=cv.width,H=cv.height,blobs=[],desc=[];const r=v=>Math.round(v);
+  blobs.push(await regionImage(0,0,W,H,1600));desc.push('Imagen 1: la foto completa.');
+  const all=[];for(const m of marks){if(m.t==='point')all.push(m);else if(m.t==='line')all.push(m.a,m.b);else all.push(...m.pts)}
+  if(blobs.length<max&&all.length){let x0=Math.min(...all.map(p=>p.x)),x1=Math.max(...all.map(p=>p.x)),y0=Math.min(...all.map(p=>p.y)),y1=Math.max(...all.map(p=>p.y));
+    const pad=Math.max(W,H)*0.07;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(W,x1+pad);y1=Math.min(H,y1+pad);
+    if((x1-x0)*(y1-y0)<W*H*0.5){blobs.push(await regionImage(x0,y0,x1,y1,1300));desc.push(`Imagen ${blobs.length}: ampliación de las marcas del usuario (x ${r(x0/W*100)}–${r(x1/W*100)} %, y ${r(y0/H*100)}–${r(y1/H*100)} %).`)}}
+  if(max-blobs.length>=4){const ov=0.04;const q=[['superior izquierdo',0,0],['superior derecho',0.5,0],['inferior izquierdo',0,0.5],['inferior derecho',0.5,0.5]];
+    for(const [n,fx,fy] of q){const x0=Math.max(0,fx-ov)*W,y0=Math.max(0,fy-ov)*H,x1=Math.min(1,fx+0.5+ov)*W,y1=Math.min(1,fy+0.5+ov)*H;blobs.push(await regionImage(x0,y0,x1,y1,1300));desc.push(`Imagen ${blobs.length}: cuarto ${n} ampliado.`)}}
+  return {blobs,desc}}
+function aiText(){if(!aiMarks.length)return '';const pc=p=>`(${(p.x/cv.width*100).toFixed(1)}, ${(p.y/cv.height*100).toFixed(1)})`;return '\n\nDibujo anterior tuyo, en AZUL sobre la foto:\n'+aiMarks.map(m=>m.t==='pt'?`- punto "${m.label||''}" ${pc(m)}`:`- ${m.closed?'zona':'línea'} "${m.label||''}" de ${pc(m.pts[0])} a ${pc(m.pts[m.pts.length-1])}`).join('\n')}
+function marksText(){if(!marks.length)return 'El usuario no ha marcado nada.';
+  const pct=p=>`(x ${(p.x/cv.width*100).toFixed(1)}, y ${(p.y/cv.height*100).toFixed(1)})`;
+  return marks.map(m=>m.t==='point'?`- Punto ${m.label} ${pct(m)}`:m.t==='line'?`- ${m.label}: segmento recto rojo de ${pct(m.a)} a ${pct(m.b)}`:`- ${m.label}: trazo a mano alzada rojo que empieza en ${pct(m.pts[0])} y acaba en ${pct(m.pts[m.pts.length-1])}`).join('\n')}
+function sheetText(){const f=[['Escala','#dEsc'],['Equidistancia','#dEq'],['Variación magnética','#dVar'],['Huso y cuadrado de 100 km','#dHuso']].map(([n,id])=>[n,$(id).value.trim()]).filter(x=>x[1]);
+  return f.length?'Datos de la hoja que da el usuario (tienen prioridad sobre lo que leas):\n'+f.map(([n,v])=>`- ${n}: ${v}`).join('\n'):'El usuario no ha indicado datos de la hoja; léelos del margen si se ven o dilo si no.'}
+
+/* ---------- chat ---------- */
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function md(s){const lines=esc(s).split('\n');let html='',list=null;
+  const inl=t=>t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');
+  const close=()=>{if(list){html+=`</${list}>`;list=null}};
+  for(const raw of lines){const l=raw.trim();let m;
+    if(!l){close();continue}
+    if((m=l.match(/^#{1,6}\s+(.*)/))){close();html+=`<h4>${inl(m[1])}</h4>`}
+    else if((m=l.match(/^[-*•]\s+(.*)/))){if(list!=='ul'){close();html+='<ul>';list='ul'}html+=`<li>${inl(m[1])}</li>`}
+    else if((m=l.match(/^\d+[.)]\s+(.*)/))){if(list!=='ol'){close();html+='<ol>';list='ol'}html+=`<li>${inl(m[1])}</li>`}
+    else{close();html+=`<p>${inl(l)}</p>`}}
+  close();return html}
+function addMsg(cls,whoText,html){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=`<div class="who">${whoText}</div><div class="body">${html}</div>`;$('#chat').appendChild(d);$('#chat').scrollTop=$('#chat').scrollHeight;return d.querySelector('.body')}
+function alertMsg(t){addMsg('ai err','Aviso',`<p>${esc(t)}</p>`)}
+function resetChat(){turns=[];[...$('#chat').querySelectorAll('.msg')].slice(1).forEach(n=>n.remove())}
+$('#reset').addEventListener('click',resetChat);
+const ERR={not_granted:'No has permitido que esta página use Claude. Puedes activarlo en el menú de permisos del artefacto.',sampling_disabled:'Claude no está disponible para esta cuenta.',rate_limited:'Demasiadas preguntas seguidas o límite de uso alcanzado. Espera un poco y vuelve a preguntar.',session_expired:'La sesión ha caducado. Vuelve a iniciar sesión en Claude.',image_rejected:'La IA no ha aceptado la imagen. Prueba con otra foto JPG o PNG más pequeña.',refused:'La IA no ha querido responder a esta pregunta. Reformúlala.',images_unavailable:'Esta vista no permite enviar imágenes a la IA.',prompt_too_large:'La conversación es demasiado larga. Pulsa Nueva conversación.'};
+function splitDraw(t){const i=t.search(/```\s*dibujo/i);if(i<0)return {shown:t,has:false,json:null};const rest=t.slice(i).replace(/^```\s*dibujo/i,'');const j=rest.indexOf('```');return {shown:t.slice(0,i).trim(),has:true,json:j>=0?rest.slice(0,j):rest}}
+function parseDraw(src){try{const o=JSON.parse(src);const arr=Array.isArray(o)?o:o.elementos;if(!Array.isArray(arr))return null;const W=cv.width,H=cv.height;
+  const ok=v=>typeof v==='number'&&isFinite(v)&&v>=-2&&v<=102;const P=(x,y)=>({x:Math.max(0,Math.min(100,x))/100*W,y:Math.max(0,Math.min(100,y))/100*H});const out=[];
+  for(const e of arr.slice(0,12)){const lab=String(e.etiqueta||e.label||'').slice(0,40);const tp=String(e.tipo||e.type||'').toLowerCase();
+    if(tp.startsWith('punt')||tp==='point'){if(ok(e.x)&&ok(e.y))out.push({t:'pt',...P(e.x,e.y),label:lab})}
+    else if(Array.isArray(e.puntos||e.points)){const pts=(e.puntos||e.points).filter(p=>Array.isArray(p)&&ok(p[0])&&ok(p[1])).map(p=>P(p[0],p[1]));if(pts.length>1)out.push({t:'pl',pts,label:lab,closed:tp.startsWith('zon')||tp==='area'})}}
+  return out}catch(err){return null}}
+const blobToB64=b=>new Promise((r,j)=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.onerror=j;f.readAsDataURL(b)});
+async function ask(question){
+  if(busy)return;question=question.trim();if(!question)return;
+  if(!img){alertMsg('Primero sube la foto del mapa.');return}
+  busy=true;$('#send').disabled=true;$('#stop').hidden=false;
+  addMsg('me','Tú',`<p>${esc(question)}</p>`);
+  const body=addMsg('ai','Lector','<p class="thinking">Leyendo el mapa…</p>');
+  let content=`${sheetText()}\n\nMarcas del usuario en la foto (en ROJO):\n${marksText()}${aiText()}${gpsText()}\n\nPregunta: ${question}`;
+  ctl=new AbortController();let text='';
+  try{
+    const built=await buildImages(6);if(built.desc.length)content+='\n\nImágenes adjuntas:\n'+built.desc.join('\n');
+    const images=await Promise.all(built.blobs.map(blobToB64));
+    const show=()=>{const t=text.replace(/<<M:[^>]*>>/g,'').replace(/^\s+/,'').replace(/<<FIN>>/g,'');if(!t.trim())return;const d=splitDraw(t);body.innerHTML=md(d.shown)+(d.has?'<p class="thinking">Preparando el dibujo…</p>':'');$('#chat').scrollTop=$('#chat').scrollHeight};
+    const once=async(tt,imgs)=>{const res=await fetch('/api/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({turns:tt,images:imgs}),signal:ctl.signal});
+      if(!res.ok){let m='';try{m=(await res.json()).error}catch(e){}throw {code:res.status===429?'rate':'http',message:m||('Error '+res.status)}}
+      const rd=res.body.getReader(),dec=new TextDecoder();let part='';for(;;){const {done,value}=await rd.read();if(done)break;const c=dec.decode(value,{stream:true});part+=c;text+=c;show()}return part};
+    const base=[...turns.slice(-8),{role:'user',content}];
+    await once(base,images);
+    for(let k=0;k<3&&!text.includes('<<FIN>>')&&!text.includes('[ERROR]')&&text.replace(/<<M:[^>]*>>/g,'').trim();k++){
+      const partial=text.replace(/<<M:[^>]*>>/g,'').replace(/^\s+/,'');body.insertAdjacentHTML('beforeend','<p class="thinking">Continuando…</p>');
+      await once([...base,{role:'assistant',content:partial},{role:'user',content:'Tu respuesta anterior se cortó. Continúa exactamente donde lo dejaste, sin repetir nada ni saludar. Si estabas escribiendo el bloque dibujo, continúa el JSON desde el carácter exacto donde quedó.'}],[])}
+    text=text.replace(/<<FIN>>/g,'').replace(/<<M:[^>]*>>/g,'');
+    {const k=text.indexOf('[ERROR]');if(k>=0){const em=text.slice(k+7).trim();text=text.slice(0,k);throw {code:'ai',message:em}}}
+    text=text.replace(/^\s+/,'');
+    if(!text.trim())throw {code:'empty',message:'La IA no ha devuelto respuesta. Vuelve a intentarlo.'};
+    const d=splitDraw(text);let note='';if(d.has){const els=parseDraw(d.json);if(els&&els.length){aiMarks=els;render();refreshNav();note='<p class="aitag">Dibujado en azul sobre el mapa.</p>'}else note='<p class="thinking">La IA intentó dibujar pero el dibujo no se pudo leer. Pídeselo otra vez.</p>'}
+    body.innerHTML=md(d.shown)+note;
+    turns.push({role:'user',content:`${content}\n(Se adjuntó la foto con las marcas.)`},{role:'assistant',content:text});
+  }catch(e){
+    if(e&&e.name==='AbortError'){body.innerHTML=(text?md(splitDraw(text).shown):'')+'<p class="thinking">Parado.</p>'}
+    else{body.parentElement.classList.add('err');const m=e&&e.code==='rate'?'Demasiadas preguntas seguidas. Espera un minuto.':(e&&e.message)||'No se ha podido conectar con la IA. Comprueba la cobertura.';body.innerHTML=(text?md(splitDraw(text).shown):'')+`<p>${esc(String(m))}</p>`}
+  }finally{busy=false;$('#send').disabled=false;$('#stop').hidden=true;ctl=null;$('#chat').scrollTop=$('#chat').scrollHeight}
+}
+$('#form').addEventListener('submit',e=>{e.preventDefault();const q=$('#q').value;$('#q').value='';ask(q)});
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#form').requestSubmit()}});
+$('#stop').addEventListener('click',()=>ctl&&ctl.abort());
+document.querySelectorAll('#quick button').forEach(b=>b.addEventListener('click',()=>ask(b.dataset.q)));
+
+/* ---------- pestañas, guardado y arranque ---------- */
+function showTab(nav){$('#tabAI').hidden=nav;$('#tabNav').hidden=!nav;$('#tbAI').setAttribute('aria-selected',!nav);$('#tbNav').setAttribute('aria-selected',nav);if(!nav)setNavTap(null);else refreshNav()}
+$('#tbAI').onclick=()=>showTab(false);$('#tbNav').onclick=()=>showTab(true);
+const KEY='lector-mapas-v1';let sv=0;
+function saveAll(){if(!photoURL)return;const sheet={};['dEsc','dEq','dVar','dHuso'].forEach(k=>sheet[k]=$('#'+k).value);
+  const nv={...NV};nv.cal=NV.cal.map(({x,y,E,N})=>({x,y,E,N}));
+  try{localStorage.setItem(KEY,JSON.stringify({photo:photoURL,marks,aiMarks,nv,sheet}))}catch(e){try{localStorage.setItem(KEY,JSON.stringify({photo:null,marks,aiMarks,nv,sheet}))}catch(e2){}}}
+function saveSoon(){clearTimeout(sv);sv=setTimeout(saveAll,700)}
+['dEsc','dEq','dVar','dHuso'].forEach(k=>$('#'+k).addEventListener('change',saveSoon));
+wireNav();refreshNav();
+(async()=>{try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.photo){await setImage(await loadImageFromURL(d.photo),d)}}catch(e){}})();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* ---------- mapa de ejemplo ---------- */
+function demoMap(){
+  let a=12345;const rnd=()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};const R=(x,y)=>x+rnd()*(y-x);
+  const W=1600,H=1200,PPK=200;const hills=[];for(let i=0;i<9;i++){const th=R(0,3.14);hills.push({x:R(-.3,8.3),y:R(-.3,6.3),a:R(140,380),sx:R(.5,1.4),sy:R(.5,1.4),c:Math.cos(th),s:Math.sin(th)})}
+  const el=(x,y)=>{let h=430;for(const g of hills){const dx=x-g.x,dy=y-g.y,u=(dx*g.c+dy*g.s)/g.sx,v=(-dx*g.s+dy*g.c)/g.sy;h+=g.a*Math.exp(-.5*(u*u+v*v))}return h};
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#F3F4EC';x.fillRect(0,0,W,H);
+  const st=.04,nx=201,ny=151,G=new Float32Array(nx*ny);for(let j=0;j<ny;j++)for(let i=0;i<nx;i++)G[j*nx+i]=el(i*st,j*st);
+  const P=(kx,ky)=>[kx*PPK,(6-ky)*PPK];const segs={};
+  for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){const v=[G[j*nx+i],G[j*nx+i+1],G[(j+1)*nx+i+1],G[(j+1)*nx+i]];const mn=Math.min(...v),mx=Math.max(...v);
+    for(let L=Math.ceil(mn/20)*20;L<=mx;L+=20){const pts=[];const X=i*st,Y=j*st;const e=(va,vb,ax,ay,bx,by)=>{if((va<L)!==(vb<L)){const t=(L-va)/(vb-va);pts.push(ax+(bx-ax)*t,ay+(by-ay)*t)}};
+      e(v[0],v[1],X,Y,X+st,Y);e(v[1],v[2],X+st,Y,X+st,Y+st);e(v[3],v[2],X,Y+st,X+st,Y+st);e(v[0],v[3],X,Y,X,Y+st);if(pts.length>=4)(segs[L]=segs[L]||[]).push(pts.slice(0,4))}}
+  for(const L in segs){const m=L%100==0;x.strokeStyle=m?'#8E4F1C':'#B0702F';x.lineWidth=m?2.2:1;x.beginPath();for(const s of segs[L]){const [a1,b1]=P(s[0],s[1]),[a2,b2]=P(s[2],s[3]);x.moveTo(a1,b1);x.lineTo(a2,b2)}x.stroke()}
+  x.font='600 16px Barlow, Arial';x.textAlign='center';x.textBaseline='middle';
+  for(const L in segs){if(L%100)continue;const arr=segs[L];for(let k=Math.floor(arr.length/4);k<arr.length;k+=Math.floor(arr.length/2)+1){const s=arr[k];const [px,py]=P(s[0],s[1]);if(px<60||px>W-60||py<50||py>H-50)continue;x.lineWidth=5;x.strokeStyle='#F3F4EC';x.strokeText(L,px,py);x.fillStyle='#8E4F1C';x.fillText(L,px,py)}}
+  x.strokeStyle='rgba(36,74,140,.75)';x.lineWidth=1.4;x.beginPath();for(let k=1;k<8;k++){x.moveTo(k*PPK,0);x.lineTo(k*PPK,H)}for(let k=1;k<6;k++){x.moveTo(0,k*PPK);x.lineTo(W,k*PPK)}x.stroke();
+  x.font='600 20px "IBM Plex Mono", monospace';x.fillStyle='#244A8C';const h=(t,a,b)=>{x.lineWidth=5;x.strokeStyle='#F3F4EC';x.strokeText(t,a,b);x.fillText(t,a,b)};
+  x.textBaseline='top';for(let k=1;k<8;k++)h(String(31+k),k*PPK,6);x.textAlign='left';x.textBaseline='middle';for(let k=1;k<6;k++)h(String(84-k),8,k*PPK);
+  let best=0,bi=0;for(let k=0;k<G.length;k++)if(G[k]>best){best=G[k];bi=k}const [vx,vy]=P((bi%nx)*st,Math.floor(bi/nx)*st);
+  x.strokeStyle='#111';x.fillStyle='#F3F4EC';x.lineWidth=2.4;x.beginPath();x.moveTo(vx,vy-13);x.lineTo(vx+11,vy+8);x.lineTo(vx-11,vy+8);x.closePath();x.fill();x.stroke();
+  x.font='600 18px Barlow, Arial';x.fillStyle='#111';x.textBaseline='middle';x.lineWidth=5;x.strokeStyle='#F3F4EC';const t='V.G. Cerro Gordo '+Math.round(best);x.textAlign=vx>W-260?'right':'left';const tx=vx+(vx>W-260?-16:16);x.strokeText(t,tx,vy);x.fillText(t,tx,vy);
+  x.strokeStyle='#111';x.lineWidth=4;x.strokeRect(2,2,W-4,H-4);
+  return c.toDataURL('image/png');
+}
+})();
+</script>
+</body>
+</html>

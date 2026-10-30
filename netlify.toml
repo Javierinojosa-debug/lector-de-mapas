@@ -1,0 +1,6 @@
+[build]
+  publish = "."
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "geolocation=(self), camera=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self)"
