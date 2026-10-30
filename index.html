@@ -149,7 +149,7 @@ button.mini{padding:3px 8px;font-size:13px}
 </head>
 <body>
 <div class="strip"><span>Uso oficial · ejercicio de topografía</span><span>Asistente: Dama Cadete Forteza · <button type="button" id="replay">repetir saludo</button></span></div>
-<div id="splash" role="dialog" aria-modal="true" aria-labelledby="splashTitle">
+<div id="splash" role="dialog" aria-modal="true" aria-label="Bienvenida">
   <div class="box">
     <svg id="avatar" viewBox="0 0 220 230" role="img" aria-label="Avatar: robot zapador topógrafo con gorra militar">
       <!-- hombros y guerrera -->
@@ -194,10 +194,9 @@ button.mini{padding:3px 8px;font-size:13px}
       </g>
     </svg>
     <div class="rank">Asistente de topografía · Carta 1:50.000</div>
-    <h2 id="splashTitle">Bienvenida, Dama Cadete Forteza</h2>
-    <p id="splashText"><span class="cur"></span></p>
+    <h2 id="splashTitle" hidden>Bienvenida, Dama Cadete Forteza</h2>
+    <p id="splashText" hidden></p>
     <button type="button" class="primary" id="startMission">Iniciar misión</button>
-    <button type="button" class="skip" id="skipVoice">Entrar sin voz</button>
   </div>
 </div>
 <div class="wrap">
@@ -740,15 +739,19 @@ document.querySelectorAll('#quick button').forEach(b=>b.addEventListener('click'
 /* ---------- bienvenida con voz ---------- */
 const WELCOME='Bienvenida, dama cadete Forteza. Soy tu asistente de topografía. Todos sabemos que a veces dudas de dónde queda Gibraltar, pero estoy seguro de que juntos haremos un gran binomio.';
 function pickVoice(){try{const v=speechSynthesis.getVoices();return v.find(x=>/^es[-_]ES/i.test(x.lang)&&/google|mónica|monica|jorge|pablo|álvaro|alvaro|elvira/i.test(x.name))||v.find(x=>/^es[-_]ES/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}catch(e){return null}}
-function speak(text){try{if(!('speechSynthesis' in window))return false;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const sp=$('#splash');u.onstart=()=>sp.classList.add('talking');u.onend=u.onerror=()=>sp.classList.remove('talking');const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;speechSynthesis.speak(u);return true}catch(e){return false}}
+function speak(text,onDone){let done=false;const fin=()=>{if(done)return;done=true;$('#splash').classList.remove('talking');onDone&&onDone()};
+  try{if(!('speechSynthesis' in window)){fin();return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;
+    u.onstart=()=>$('#splash').classList.add('talking');u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);
+    setTimeout(fin,Math.max(12000,text.length*95))}catch(e){fin()}}
 try{speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>{}}catch(e){}
-let typeTimer=0;function typeText(){const el=$('#splashText');clearInterval(typeTimer);let i=0;const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(reduce){el.textContent=WELCOME;return}typeTimer=setInterval(()=>{i+=2;el.innerHTML=esc(WELCOME.slice(0,i))+'<span class="cur"></span>';if(i>=WELCOME.length)clearInterval(typeTimer)},45)}
-function closeSplash(){$('#splash').hidden=true}
-$('#startMission').onclick=()=>{speak(WELCOME);typeText();$('#startMission').textContent='Entrar';$('#startMission').onclick=closeSplash};
-$('#skipVoice').onclick=()=>{try{speechSynthesis.cancel()}catch(e){}closeSplash()};
+let typeTimer=0;function typeText(cb){const el=$('#splashText');clearInterval(typeTimer);let i=0;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=WELCOME;cb&&cb();return}
+  typeTimer=setInterval(()=>{i+=1;el.innerHTML=esc(WELCOME.slice(0,i))+'<span class="cur"></span>';if(i>=WELCOME.length){clearInterval(typeTimer);el.textContent=WELCOME;cb&&cb()}},55)}
+function closeSplash(){try{speechSynthesis.cancel()}catch(e){}$('#splash').hidden=true}
+$('#startMission').onclick=()=>{const btn=$('#startMission');btn.hidden=true;$('#splashTitle').hidden=false;$('#splashText').hidden=false;
+  let spoken=false,typed=false;const ready=()=>{if(spoken&&typed){btn.textContent='Entrar';btn.onclick=closeSplash;btn.hidden=false;btn.focus()}};
+  speak(WELCOME,()=>{spoken=true;ready()});typeText(()=>{typed=true;ready()})};
 $('#replay').onclick=()=>speak(WELCOME);
-typeText();
 
 /* ---------- pestañas, guardado y arranque ---------- */
 function showTab(nav){$('#tabAI').hidden=nav;$('#tabNav').hidden=!nav;$('#tbAI').setAttribute('aria-selected',!nav);$('#tbNav').setAttribute('aria-selected',nav);if(!nav)setNavTap(null);else refreshNav()}
