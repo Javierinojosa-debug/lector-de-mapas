@@ -54,9 +54,10 @@ export default async (req)=>{
       const call=(model,extra)=>fetch(base+'/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','content-type':'application/json'},
           body:JSON.stringify({model,max_tokens:2000,system:RULES,messages:msgs,stream:true,...extra})});
       for(const model of MODELS){
-        let mode='disabled';r=await call(model,{thinking:{type:'disabled'}});
-        if(!r.ok&&r.status===400){lastErr=(await r.text()).slice(0,200);mode='budget';r=await call(model,{thinking:{type:'enabled',budget_tokens:1024},max_tokens:3000})}
-        if(!r.ok&&r.status===400){lastErr=(await r.text()).slice(0,200);mode='default';r=await call(model,{})}
+        // Sonnet/Opus 5.5 piensan por defecto (adaptive). Pedimos el mínimo de razonamiento para responder antes del corte.
+        const variants=[['effort-low',{output_config:{effort:'low'}}],['adaptive-low',{thinking:{type:'adaptive'},output_config:{effort:'low'}}],['disabled',{thinking:{type:'disabled'}}],['budget',{thinking:{type:'enabled',budget_tokens:1024},max_tokens:3000}],['default',{}]];
+        let mode='';
+        for(const [name,extra] of variants){mode=name;r=await call(model,extra);if(r.ok||r.status!==400)break;const e=(await r.text()).replace(/[<>]/g,'').slice(0,160);lastErr=e;send('<<E:'+name+': '+e+'>>')}
         if(r.ok)send('<<M:'+model+':'+mode+'>>');
         console.log('gateway',model,r.status,Date.now()-T0,'ms');if(r.ok)break;lastErr=(await r.text()).slice(0,200);if(r.status===429)break;
       }

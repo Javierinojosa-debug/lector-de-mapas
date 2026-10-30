@@ -633,21 +633,21 @@ async function ask(question){
   try{
     const built=await buildImages(6);if(built.desc.length)content+='\n\nImágenes adjuntas:\n'+built.desc.join('\n');
     const images=await Promise.all(built.blobs.map(blobToB64));
-    const show=()=>{const t=text.replace(/<<[MT]:[^>]*>>/g,'').replace(/^\s+/,'').replace(/<<FIN>>/g,'');if(!t.trim())return;const d=splitDraw(t);body.innerHTML=md(d.shown)+(d.has?'<p class="thinking">Preparando el dibujo…</p>':'');$('#chat').scrollTop=$('#chat').scrollHeight};
+    const show=()=>{const t=text.replace(/<<[MTE]:[^>]*>>/g,'').replace(/^\s+/,'').replace(/<<FIN>>/g,'');if(!t.trim())return;const d=splitDraw(t);body.innerHTML=md(d.shown)+(d.has?'<p class="thinking">Preparando el dibujo…</p>':'');$('#chat').scrollTop=$('#chat').scrollHeight};
     const once=async(tt,imgs)=>{const res=await fetch('/api/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({turns:tt,images:imgs}),signal:ctl.signal});
       if(!res.ok){let m='';try{m=(await res.json()).error}catch(e){}throw {code:res.status===429?'rate':'http',message:m||('Error '+res.status)}}
       const rd=res.body.getReader(),dec=new TextDecoder();let part='';for(;;){const {done,value}=await rd.read();if(done)break;const c=dec.decode(value,{stream:true});part+=c;text+=c;show()}return part};
     const base=[...turns.slice(-8),{role:'user',content}];
     const t0=performance.now();await once(base,images);
-    if(!text.replace(/<<[MT]:[^>]*>>/g,'').trim()&&!text.includes('[ERROR]')&&images.length>2){
+    if(!text.replace(/<<[MTE]:[^>]*>>/g,'').trim()&&!text.includes('[ERROR]')&&images.length>2){
       const secs=Math.round((performance.now()-t0)/1000);const mm=(text.match(/<<M:([^>]*)>>/)||[])[1]||'sin conexión con el modelo';const th=/<<T:/.test(text);
       body.innerHTML=`<p class="thinking">La conexión se cortó a los ${secs} s ${th?'mientras la IA pensaba':'antes de empezar a escribir'} (${esc(mm)}). Reintento con menos imágenes…</p>`;
       text='';await once([...turns.slice(-8),{role:'user',content:content+'\n\n(Reintento: responde directamente y sin rodeos.)'}],images.slice(0,2));
-      if(!text.replace(/<<[MT]:[^>]*>>/g,'').trim()&&!text.includes('[ERROR]'))throw {code:'empty',message:`La IA no ha devuelto respuesta (corte a los ${Math.round((performance.now()-t0)/1000)} s, ${th?'pensando':'sin empezar'}, ${mm}). Prueba con una pregunta más concreta o una foto más cercana.`}}
-    for(let k=0;k<3&&!text.includes('<<FIN>>')&&!text.includes('[ERROR]')&&text.replace(/<<[MT]:[^>]*>>/g,'').trim();k++){
-      const partial=text.replace(/<<[MT]:[^>]*>>/g,'').replace(/^\s+/,'');body.insertAdjacentHTML('beforeend','<p class="thinking">Continuando…</p>');
+      if(!text.replace(/<<[MTE]:[^>]*>>/g,'').trim()&&!text.includes('[ERROR]'))throw {code:'empty',message:`La IA no ha devuelto respuesta (corte a los ${Math.round((performance.now()-t0)/1000)} s, ${th?'pensando':'sin empezar'}, ${mm}). Prueba con una pregunta más concreta o una foto más cercana.`}}
+    for(let k=0;k<3&&!text.includes('<<FIN>>')&&!text.includes('[ERROR]')&&text.replace(/<<[MTE]:[^>]*>>/g,'').trim();k++){
+      const partial=text.replace(/<<[MTE]:[^>]*>>/g,'').replace(/^\s+/,'');body.insertAdjacentHTML('beforeend','<p class="thinking">Continuando…</p>');
       await once([...base,{role:'assistant',content:partial},{role:'user',content:'Tu respuesta anterior se cortó. Continúa exactamente donde lo dejaste, sin repetir nada ni saludar. Si estabas escribiendo el bloque dibujo, continúa el JSON desde el carácter exacto donde quedó.'}],[])}
-    text=text.replace(/<<FIN>>/g,'').replace(/<<[MT]:[^>]*>>/g,'');
+    text=text.replace(/<<FIN>>/g,'').replace(/<<[MTE]:[^>]*>>/g,'');
     {const k=text.indexOf('[ERROR]');if(k>=0){const em=text.slice(k+7).trim();text=text.slice(0,k);throw {code:'ai',message:em}}}
     text=text.replace(/^\s+/,'');
     if(!text.trim())throw {code:'empty',message:'La IA no ha devuelto respuesta. Vuelve a intentarlo.'};
@@ -656,7 +656,7 @@ async function ask(question){
     turns.push({role:'user',content:`${content}\n(Se adjuntó la foto con las marcas.)`},{role:'assistant',content:text});
   }catch(e){
     if(e&&e.name==='AbortError'){body.innerHTML=(text?md(splitDraw(text).shown):'')+'<p class="thinking">Parado.</p>'}
-    else{body.parentElement.classList.add('err');const m=e&&e.code==='rate'?'Demasiadas preguntas seguidas. Espera un minuto.':(e&&e.message)||'No se ha podido conectar con la IA. Comprueba la cobertura.';body.innerHTML=(text?md(splitDraw(text).shown):'')+`<p>${esc(String(m))}</p>`}
+    else{body.parentElement.classList.add('err');const m=e&&e.code==='rate'?'Demasiadas preguntas seguidas. Espera un minuto.':(e&&e.message)||'No se ha podido conectar con la IA. Comprueba la cobertura.';const clean=text.replace(/<<[MTE]:[^>]*>>/g,'').trim();body.innerHTML=(clean?md(splitDraw(clean).shown):'')+`<p>${esc(String(m))}</p>`}
   }finally{busy=false;$('#send').disabled=false;$('#stop').hidden=true;ctl=null;$('#chat').scrollTop=$('#chat').scrollHeight}
 }
 $('#form').addEventListener('submit',e=>{e.preventDefault();const q=$('#q').value;$('#q').value='';ask(q)});
