@@ -1,4 +1,4 @@
-// Edge function: proxy a Claude (Netlify AI Gateway), en streaming sin el límite de 26 s de las funciones normales. Las credenciales las inyecta Netlify: ANTHROPIC_API_KEY y ANTHROPIC_BASE_URL.
+// Edge function: proxy a la API de Claude con la clave propia del usuario, en streaming.
 const RULES=`Eres un instructor experto en topografía militar española (cartas del Servicio Geográfico del Ejército, Serie L y MTN 1:50.000/1:25.000, cuadrícula UTM/MGRS, milésimas OTAN 6400). Ayudas a una alumna a resolver ejercicios sobre una carta real de la que te manda una foto.
 
 Cómo responder:
@@ -29,8 +29,9 @@ const bad=(msg,status=400)=>Response.json({error:msg},{status});
 
 export default async (req)=>{
   if(req.method!=='POST')return bad('Método no permitido',405);
-  const key=Netlify.env.get('ANTHROPIC_API_KEY'),base=(Netlify.env.get('ANTHROPIC_BASE_URL')||'https://api.anthropic.com').replace(/\/$/,'');
-  if(!key)return bad('La IA no está activada en este proyecto de Netlify.',503);
+  // Solo la clave propia de la API de Claude (variable CLAUDE_API_KEY), siempre contra api.anthropic.com: el coste va a tu cuenta de Anthropic, nunca a créditos de Netlify.
+  const key=Netlify.env.get('CLAUDE_API_KEY'),base='https://api.anthropic.com';
+  if(!key)return bad('Falta la clave de la API de Claude: añade la variable CLAUDE_API_KEY en Netlify y vuelve a desplegar.',503);
   let body;try{body=await req.json()}catch{return bad('Petición no válida')}
   const turns=Array.isArray(body.turns)?body.turns.slice(-9):[];const images=Array.isArray(body.images)?body.images.slice(0,6):[];
   if(!turns.length||turns[turns.length-1].role!=='user')return bad('Falta la pregunta');
