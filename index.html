@@ -737,7 +737,20 @@ $('#stop').addEventListener('click',()=>ctl&&ctl.abort());
 document.querySelectorAll('#quick button').forEach(b=>b.addEventListener('click',()=>ask(b.dataset.q)));
 
 /* ---------- bienvenida con voz ---------- */
-const WELCOME='Bienvenida, dama cadete Forteza. Soy tu asistente de topografía. Todos sabemos que a veces dudas de dónde queda Gibraltar, pero estoy seguro de que juntos haremos un gran binomio.';
+const FIRST='Bienvenida, dama cadete Forteza. Soy tu asistente de topografía. Todos sabemos que a veces dudas de dónde queda Gibraltar, pero estoy seguro de que juntos haremos un gran binomio.';
+const JOKES=[
+ 'Bienvenida, dama cadete Forteza. Soy tu compañero fiel en el campo de batalla. Todos sabemos que en el campo estás más perdida que un pulpo en un garaje, pero juntos cumpliremos la misión.',
+ 'Bienvenida, dama cadete Forteza. No sabes ni por dónde sale el sol y quieres ganar una batalla. Tranquila: para eso estoy yo, y la brújula.',
+ 'Bienvenida, dama cadete Forteza. La última vez te mandaron a atacar Marruecos y acabaste asaltando la cocina del restaurante. Hoy probamos con el mapa del derecho.',
+ 'Bienvenida, dama cadete Forteza. Recuerda: el norte está arriba del mapa, no donde haya mejor cobertura. Vamos allá.',
+ 'Bienvenida, dama cadete Forteza. Tu sentido de la orientación es como el GPS de un submarino: en teoría existe. Por suerte me tienes a mí.',
+ 'Bienvenida, dama cadete Forteza. Si una curva de nivel te parece un dibujo de tu sobrino, es normal. Hoy aprenderemos a leerlas sin pedir socorro.',
+ 'Bienvenida, dama cadete Forteza. Dicen que en la última marcha le preguntaste a una vaca por la ruta más corta. La vaca acertó. Hoy vamos a superar a la vaca.',
+ 'Bienvenida, dama cadete Forteza. Antes de empezar: el mapa se sujeta con las letras hacia arriba. Con esto ya llevamos media guerra ganada.'];
+const WKEY='bienvenida-forteza';let seen=null;try{seen=JSON.parse(localStorage.getItem(WKEY))}catch(e){}
+let jokeIdx=-1;if(seen&&seen.first){do{jokeIdx=Math.floor(Math.random()*JOKES.length)}while(JOKES.length>1&&jokeIdx===seen.last)}
+const WELCOME=jokeIdx<0?FIRST:JOKES[jokeIdx];
+function markSeen(){try{localStorage.setItem(WKEY,JSON.stringify({first:true,last:jokeIdx}))}catch(e){}}
 function pickVoice(){try{const v=speechSynthesis.getVoices();return v.find(x=>/^es[-_]ES/i.test(x.lang)&&/google|mónica|monica|jorge|pablo|álvaro|alvaro|elvira/i.test(x.name))||v.find(x=>/^es[-_]ES/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}catch(e){return null}}
 function speak(text,onDone){let done=false;const fin=()=>{if(done)return;done=true;$('#splash').classList.remove('talking');onDone&&onDone()};
   try{if(!('speechSynthesis' in window)){fin();return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;
@@ -750,7 +763,7 @@ let typeTimer=0;function typeText(cb){const el=$('#splashText');clearInterval(ty
 function closeSplash(){try{speechSynthesis.cancel()}catch(e){}$('#splash').hidden=true}
 $('#startMission').onclick=()=>{const btn=$('#startMission');btn.hidden=true;$('#splashTitle').hidden=false;$('#splashText').hidden=false;
   let spoken=false,typed=false;const ready=()=>{if(spoken&&typed){btn.textContent='Entrar';btn.onclick=closeSplash;btn.hidden=false;btn.focus()}};
-  speak(WELCOME,()=>{spoken=true;ready()});typeText(()=>{typed=true;ready()})};
+  speak(WELCOME,()=>{spoken=true;markSeen();ready()});typeText(()=>{typed=true;ready()})};
 $('#replay').onclick=()=>speak(WELCOME);
 
 /* ---------- pestañas, guardado y arranque ---------- */
