@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1C221D">
+<meta name="theme-color" content="#1B1F14">
 <title>Lector de Mapas</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -11,34 +11,39 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Saira+Condensed:wght@500;600;700&family=Saira:wght@400;500;600&family=Share+Tech+Mono&display=swap">
 <style>
 /* Layout: foto del mapa con herramientas de marcado a la izquierda; conversación con la IA a la derecha. En móvil, mapa arriba y chat debajo. */
 :root{
-  --bg:#EBEEE7; --surface:#F7F8F4; --ink:#1C221D; --muted:#5A6557; --line:#CBD2C4; --chip:#DFE4D8;
-  --accent:#B3261E; --accent-ink:#FFFFFF; --bad:#B3261E; --bad-bg:#F7E3E1; --me:#E4E9DD;
-  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
-  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  /* Paleta militar única (oscura): verde oliva de campaña, caqui de cartografía y ámbar de señalización */
+  --bg:#1A1E13; --surface:#232919; --ink:#E6DFC4; --muted:#A8A283; --line:#3D4530; --chip:#30381F;
+  --accent:#D9A21B; --accent-ink:#1A1E13; --bad:#E2583F; --bad-bg:#3A1F17; --me:#2E3520;
+  --f-display:"Saira Condensed","Arial Narrow",sans-serif;
+  --f-stencil:"Saira Stencil One","Saira Condensed",Impact,sans-serif;
+  --f-body:"Saira",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"Share Tech Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#141915; --surface:#1C221D; --ink:#E4E9E0; --muted:#9BA696; --line:#2E372F; --chip:#273027;
-  --accent:#EF5A50; --accent-ink:#1A0F0E; --bad:#F27A71; --bad-bg:#3A1C1A; --me:#253025; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#141915; --surface:#1C221D; --ink:#E4E9E0; --muted:#9BA696; --line:#2E372F; --chip:#273027;
-  --accent:#EF5A50; --accent-ink:#1A0F0E; --bad:#F27A71; --bad-bg:#3A1C1A; --me:#253025; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+body{margin:0;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;background-color:var(--bg);
+  background-image:linear-gradient(rgba(230,223,196,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(230,223,196,.035) 1px,transparent 1px),
+  radial-gradient(ellipse 60% 40% at 15% 10%,rgba(84,96,52,.35),transparent 70%),radial-gradient(ellipse 50% 35% at 85% 30%,rgba(60,48,30,.35),transparent 70%),radial-gradient(ellipse 55% 40% at 50% 90%,rgba(70,82,44,.3),transparent 70%);
+  background-size:40px 40px,40px 40px,100% 100%,100% 100%,100% 100%;background-attachment:fixed}
+.strip{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);padding:5px max(16px,env(safe-area-inset-left,0px));}
+.strip button{all:unset;cursor:pointer;text-decoration:underline;font:inherit}
+.strip button:focus-visible{outline:2px solid var(--accent-ink)}
 .wrap{max-width:1320px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header{margin-bottom:16px}
 .eyebrow{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-h1{font-family:var(--f-display);font-weight:700;font-size:clamp(34px,5vw,52px);line-height:.95;margin:4px 0 6px;text-wrap:balance}
+h1{font-family:var(--f-stencil);font-weight:400;letter-spacing:.04em;text-transform:uppercase;font-size:clamp(34px,5vw,52px);line-height:.95;margin:4px 0 6px;text-wrap:balance}
 h1 span{color:var(--accent)}
 .lede{margin:0;color:var(--muted);max-width:62ch}
 .layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);gap:20px;align-items:start}
 @media (max-width:920px){.layout{grid-template-columns:minmax(0,1fr)}}
-.card{background:var(--surface);border:1px solid var(--line);padding:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);padding:14px;min-width:0;position:relative;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.card::before,.card::after{content:'';position:absolute;width:14px;height:14px;border:2px solid var(--accent);pointer-events:none}
+.card::before{top:-1px;left:-1px;border-right:0;border-bottom:0}.card::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
 .mlabel{font-family:var(--f-display);font-weight:600;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 button,.btnlike{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:8px 12px;cursor:pointer;line-height:1.1;display:inline-flex;align-items:center;gap:6px}
 button:hover,.btnlike:hover{background:var(--chip)}
@@ -74,7 +79,7 @@ input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
 .msg p{margin:6px 0}
 .msg ul,.msg ol{margin:6px 0;padding-left:20px}
 .msg code{font-family:var(--f-mono);font-size:.92em;background:var(--chip);padding:0 4px}
-.aitag{color:#0B5FD6;font-weight:600}
+.aitag{color:#7DB2FF;font-weight:600}
 .thinking{color:var(--muted);font-style:italic}
 .quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .quick button{text-transform:none;letter-spacing:0;font-family:var(--f-body);font-weight:500;font-size:13.5px;padding:5px 9px;border-width:1px}
@@ -124,12 +129,33 @@ button.mini{padding:3px 8px;font-size:13px}
 #arTurn{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.04em;text-transform:uppercase}
 #miniMap{width:120px;height:120px;border:2px solid #fff;background:#222;flex:none}
 #arrived{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(29,116,73,.88);font-family:var(--f-display);font-size:38px;font-weight:700;text-align:center;padding:20px}
+#splash{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-left,0px));background:var(--bg);background-image:inherit}
+#splash .box{max-width:560px;width:100%;border:2px solid var(--accent);background:rgba(26,30,19,.92);padding:28px 24px;text-align:center;position:relative}
+#splash .rank{font-family:var(--f-mono);font-size:12px;letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
+#splash h2{font-family:var(--f-stencil);font-weight:400;font-size:clamp(30px,7vw,44px);line-height:1;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.04em}
+#splash p{font-family:var(--f-mono);font-size:15.5px;line-height:1.55;min-height:6.5em;text-align:left;margin:0 0 18px}
+#splash svg{width:84px;height:84px;margin:0 auto 6px;display:block}
+#splash button{font-size:18px;padding:12px 20px}
+#splash .skip{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;padding:4px}
+@keyframes blink{50%{opacity:0}}.cur{display:inline-block;width:.6em;height:1em;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@media (prefers-reduced-motion:reduce){.cur{animation:none}}
 </style>
 </head>
 <body>
+<div class="strip"><span>Uso oficial · ejercicio de topografía</span><span>Asistente: Dama Cadete Forteza · <button type="button" id="replay">repetir saludo</button></span></div>
+<div id="splash" role="dialog" aria-modal="true" aria-labelledby="splashTitle">
+  <div class="box">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#D9A21B" stroke-width="3"/><circle cx="50" cy="50" r="34" fill="none" stroke="#E6DFC4" stroke-width="1" stroke-dasharray="2 4"/><path d="M50 8 L58 50 L50 44 L42 50 Z" fill="#D9A21B"/><path d="M50 92 L42 50 L50 56 L58 50 Z" fill="#E6DFC4"/><path d="M8 50 L50 46 L50 54 Z M92 50 L50 54 L50 46 Z" fill="#A8A283"/><text x="50" y="22" text-anchor="middle" font-size="9" fill="#1A1E13" font-family="monospace" font-weight="700">N</text></svg>
+    <div class="rank">Asistente de topografía · Carta 1:50.000</div>
+    <h2 id="splashTitle">Bienvenida, Dama Cadete Forteza</h2>
+    <p id="splashText"><span class="cur"></span></p>
+    <button type="button" class="primary" id="startMission">Iniciar misión</button>
+    <button type="button" class="skip" id="skipVoice">Entrar sin voz</button>
+  </div>
+</div>
 <div class="wrap">
   <header>
-    <div class="eyebrow">Topografía militar · lectura de cartas con IA y guiado GPS</div>
+    <div class="eyebrow">Topografía militar · lectura de cartas con IA y guiado GPS · Dama Cadete Forteza</div>
     <h1>Lector <span>de</span> Mapas</h1>
     <p class="lede">Haz una foto al mapa, marca puntos y líneas encima y pregunta. La IA lee la carta, hace las cuentas y dibuja. En «Navegar» calibras la foto con la cuadrícula y te guía con GPS y cámara hasta el punto que elijas.</p>
   </header>
@@ -663,6 +689,19 @@ $('#form').addEventListener('submit',e=>{e.preventDefault();const q=$('#q').valu
 $('#q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#form').requestSubmit()}});
 $('#stop').addEventListener('click',()=>ctl&&ctl.abort());
 document.querySelectorAll('#quick button').forEach(b=>b.addEventListener('click',()=>ask(b.dataset.q)));
+
+/* ---------- bienvenida con voz ---------- */
+const WELCOME='Bienvenida, dama cadete Forteza. Soy tu asistente de topografía. Todos sabemos que a veces dudas de dónde queda Gibraltar, pero estoy seguro de que juntos haremos un gran binomio.';
+function pickVoice(){try{const v=speechSynthesis.getVoices();return v.find(x=>/^es[-_]ES/i.test(x.lang)&&/google|mónica|monica|jorge|pablo|álvaro|alvaro|elvira/i.test(x.name))||v.find(x=>/^es[-_]ES/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}catch(e){return null}}
+function speak(text){try{if(!('speechSynthesis' in window))return false;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;speechSynthesis.speak(u);return true}catch(e){return false}}
+try{speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>{}}catch(e){}
+let typeTimer=0;function typeText(){const el=$('#splashText');clearInterval(typeTimer);let i=0;const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){el.textContent=WELCOME;return}typeTimer=setInterval(()=>{i+=2;el.innerHTML=esc(WELCOME.slice(0,i))+'<span class="cur"></span>';if(i>=WELCOME.length)clearInterval(typeTimer)},45)}
+function closeSplash(){$('#splash').hidden=true}
+$('#startMission').onclick=()=>{speak(WELCOME);typeText();$('#startMission').textContent='Entrar';$('#startMission').onclick=closeSplash};
+$('#skipVoice').onclick=()=>{try{speechSynthesis.cancel()}catch(e){}closeSplash()};
+$('#replay').onclick=()=>speak(WELCOME);
+typeText();
 
 /* ---------- pestañas, guardado y arranque ---------- */
 function showTab(nav){$('#tabAI').hidden=nav;$('#tabNav').hidden=!nav;$('#tbAI').setAttribute('aria-selected',!nav);$('#tbNav').setAttribute('aria-selected',nav);if(!nav)setNavTap(null);else refreshNav()}
