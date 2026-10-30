@@ -64,7 +64,7 @@ export default async (req)=>{
       const reader=r.body.getReader();let buf='',stop='';
       for(;;){const {done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
         while((i=buf.indexOf('\n\n'))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);const line=ev.split('\n').find(l=>l.startsWith('data:'));if(!line)continue;
-          try{const j=JSON.parse(line.slice(5));if(j.type==='content_block_start')console.log('block',j.content_block&&j.content_block.type,Date.now()-T0);if(j.type==='content_block_delta'&&j.delta&&j.delta.type==='text_delta'){if(!got)console.log('first text',Date.now()-T0);got=true;send(j.delta.text)}
+          try{const j=JSON.parse(line.slice(5));if(j.type==='content_block_start'){const bt=j.content_block&&j.content_block.type;console.log('block',bt,Date.now()-T0);if(bt&&bt!=='text')send('<<T:'+bt+'>>')}if(j.type==='content_block_delta'&&j.delta&&j.delta.type==='text_delta'){if(!got)console.log('first text',Date.now()-T0);got=true;send(j.delta.text)}
             else if(j.type==='message_delta'&&j.delta&&j.delta.stop_reason){stop=j.delta.stop_reason;stopR=stop}else if(j.type==='message_stop'&&stop!=='max_tokens')send(got?'\n<<FIN>>':'\n[ERROR] La IA no ha escrito respuesta ('+(stop||'sin motivo')+'). Vuelve a preguntar.');else if(j.type==='error')send('\n[ERROR] '+(j.error&&j.error.message||'error de la IA'))}catch{}}}
     }catch(e){console.log('error',String(e),Date.now()-T0);send('\n[ERROR] Conexión con la IA interrumpida.')}
     finally{console.log('end',stopR,Date.now()-T0);clearInterval(ping);try{ctrl.close()}catch{}}
