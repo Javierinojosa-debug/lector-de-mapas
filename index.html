@@ -134,7 +134,13 @@ button.mini{padding:3px 8px;font-size:13px}
 #splash .rank{font-family:var(--f-mono);font-size:12px;letter-spacing:.2em;color:var(--accent);text-transform:uppercase}
 #splash h2{font-family:var(--f-stencil);font-weight:400;font-size:clamp(30px,7vw,44px);line-height:1;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.04em}
 #splash p{font-family:var(--f-mono);font-size:15.5px;line-height:1.55;min-height:6.5em;text-align:left;margin:0 0 18px}
-#splash svg{width:84px;height:84px;margin:0 auto 6px;display:block}
+#splash #avatar{width:min(190px,48vw);height:auto;margin:0 auto 8px;display:block}
+.talking #mouth rect{animation:talk .22s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+.talking #mouth rect:nth-child(2n){animation-delay:.11s}
+@keyframes talk{from{transform:scaleY(.25)}to{transform:scaleY(1.15)}}
+.eye{animation:blinkEye 4s infinite;transform-box:fill-box;transform-origin:center}
+@keyframes blinkEye{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@media (prefers-reduced-motion:reduce){.talking #mouth rect,.eye{animation:none}}
 #splash button{font-size:18px;padding:12px 20px}
 #splash .skip{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;padding:4px}
 @keyframes blink{50%{opacity:0}}.cur{display:inline-block;width:.6em;height:1em;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite}
@@ -145,7 +151,48 @@ button.mini{padding:3px 8px;font-size:13px}
 <div class="strip"><span>Uso oficial · ejercicio de topografía</span><span>Asistente: Dama Cadete Forteza · <button type="button" id="replay">repetir saludo</button></span></div>
 <div id="splash" role="dialog" aria-modal="true" aria-labelledby="splashTitle">
   <div class="box">
-    <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#D9A21B" stroke-width="3"/><circle cx="50" cy="50" r="34" fill="none" stroke="#E6DFC4" stroke-width="1" stroke-dasharray="2 4"/><path d="M50 8 L58 50 L50 44 L42 50 Z" fill="#D9A21B"/><path d="M50 92 L42 50 L50 56 L58 50 Z" fill="#E6DFC4"/><path d="M8 50 L50 46 L50 54 Z M92 50 L50 54 L50 46 Z" fill="#A8A283"/><text x="50" y="22" text-anchor="middle" font-size="9" fill="#1A1E13" font-family="monospace" font-weight="700">N</text></svg>
+    <svg id="avatar" viewBox="0 0 220 230" role="img" aria-label="Avatar: robot zapador topógrafo con gorra militar">
+      <!-- hombros y guerrera -->
+      <path d="M30 230 C34 188 62 172 110 170 C158 172 186 188 190 230 Z" fill="#4B5531"/>
+      <path d="M92 172 L110 196 L128 172 Z" fill="#3A4226"/>
+      <rect x="64" y="182" width="22" height="12" fill="#3A4226" stroke="#D9A21B" stroke-width="1"/>
+      <rect x="134" y="182" width="22" height="12" fill="#3A4226" stroke="#D9A21B" stroke-width="1"/>
+      <!-- castillo de Ingenieros en el pecho -->
+      <g transform="translate(136,200)" fill="#D9A21B"><rect x="0" y="6" width="18" height="10"/><rect x="0" y="2" width="4" height="5"/><rect x="7" y="2" width="4" height="5"/><rect x="14" y="2" width="4" height="5"/><rect x="7" y="10" width="4" height="6" fill="#4B5531"/></g>
+      <!-- cuello -->
+      <rect x="96" y="150" width="28" height="22" fill="#6E735E"/>
+      <path d="M96 158 h28 M96 165 h28" stroke="#4E5242" stroke-width="2"/>
+      <!-- cabeza -->
+      <rect x="58" y="74" width="104" height="82" rx="16" fill="#8A8F78" stroke="#4E5242" stroke-width="3"/>
+      <path d="M58 116 h104" stroke="#6E735E" stroke-width="2"/>
+      <circle cx="66" cy="84" r="2.5" fill="#4E5242"/><circle cx="154" cy="84" r="2.5" fill="#4E5242"/><circle cx="66" cy="148" r="2.5" fill="#4E5242"/><circle cx="154" cy="148" r="2.5" fill="#4E5242"/>
+      <!-- orejas: antena de radio -->
+      <rect x="46" y="100" width="12" height="26" rx="3" fill="#6E735E"/><rect x="162" y="100" width="12" height="26" rx="3" fill="#6E735E"/>
+      <path d="M168 100 V60" stroke="#4E5242" stroke-width="3"/><circle cx="168" cy="58" r="4" fill="#E2583F"/>
+      <!-- ojos -->
+      <rect x="74" y="94" width="28" height="18" rx="4" fill="#1A1E13"/><rect x="118" y="94" width="28" height="18" rx="4" fill="#1A1E13"/>
+      <circle class="eye" cx="88" cy="103" r="6" fill="#D9A21B"/><circle class="eye" cx="132" cy="103" r="6" fill="#D9A21B"/>
+      <!-- boca: rejilla que se mueve al hablar -->
+      <rect x="80" y="126" width="60" height="18" rx="4" fill="#1A1E13"/>
+      <g id="mouth" fill="#E6DFC4"><rect x="86" y="131" width="6" height="8"/><rect x="96" y="131" width="6" height="8"/><rect x="106" y="131" width="6" height="8"/><rect x="116" y="131" width="6" height="8"/><rect x="126" y="131" width="6" height="8"/></g>
+      <!-- gorra militar de plato -->
+      <ellipse cx="110" cy="62" rx="64" ry="18" fill="#4B5531" stroke="#2E341C" stroke-width="2"/>
+      <path d="M62 66 C62 44 158 44 158 66 Z" fill="#56613A"/>
+      <rect x="64" y="64" width="92" height="12" fill="#2E341C"/>
+      <rect x="64" y="66" width="92" height="3" fill="#D9A21B"/>
+      <path d="M66 76 C80 92 140 92 154 76 Z" fill="#141810"/>
+      <!-- emblema de la gorra: castillo -->
+      <g transform="translate(99,46)" fill="#D9A21B" stroke="#1A1E13" stroke-width=".6"><rect x="0" y="6" width="22" height="12"/><rect x="0" y="1" width="5" height="6"/><rect x="8.5" y="1" width="5" height="6"/><rect x="17" y="1" width="5" height="6"/><rect x="8.5" y="11" width="5" height="7" fill="#56613A"/></g>
+      <!-- mano con mapa topográfico -->
+      <g transform="translate(26,176) rotate(-12)">
+        <rect x="0" y="0" width="58" height="42" fill="#E6DFC4" stroke="#8E4F1C" stroke-width="1.5"/>
+        <path d="M14 0 v42 M29 0 v42 M44 0 v42 M0 14 h58 M0 28 h58" stroke="#3E6CB0" stroke-width=".8"/>
+        <path d="M4 34 C14 18 26 26 32 14 S50 8 54 20" fill="none" stroke="#8E4F1C" stroke-width="1.4"/>
+        <path d="M8 38 C18 26 30 32 36 22 S50 18 54 30" fill="none" stroke="#B0702F" stroke-width="1"/>
+        <path d="M18 30 l4 -4 l4 4 l-4 -1 z" fill="#E2583F"/>
+        <ellipse cx="54" cy="36" rx="9" ry="7" fill="#8A8F78" stroke="#4E5242" stroke-width="2"/>
+      </g>
+    </svg>
     <div class="rank">Asistente de topografía · Carta 1:50.000</div>
     <h2 id="splashTitle">Bienvenida, Dama Cadete Forteza</h2>
     <p id="splashText"><span class="cur"></span></p>
@@ -693,7 +740,7 @@ document.querySelectorAll('#quick button').forEach(b=>b.addEventListener('click'
 /* ---------- bienvenida con voz ---------- */
 const WELCOME='Bienvenida, dama cadete Forteza. Soy tu asistente de topografía. Todos sabemos que a veces dudas de dónde queda Gibraltar, pero estoy seguro de que juntos haremos un gran binomio.';
 function pickVoice(){try{const v=speechSynthesis.getVoices();return v.find(x=>/^es[-_]ES/i.test(x.lang)&&/google|mónica|monica|jorge|pablo|álvaro|alvaro|elvira/i.test(x.name))||v.find(x=>/^es[-_]ES/i.test(x.lang))||v.find(x=>/^es/i.test(x.lang))||null}catch(e){return null}}
-function speak(text){try{if(!('speechSynthesis' in window))return false;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;speechSynthesis.speak(u);return true}catch(e){return false}}
+function speak(text){try{if(!('speechSynthesis' in window))return false;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-ES';const sp=$('#splash');u.onstart=()=>sp.classList.add('talking');u.onend=u.onerror=()=>sp.classList.remove('talking');const v=pickVoice();if(v)u.voice=v;u.rate=0.97;u.pitch=0.9;speechSynthesis.speak(u);return true}catch(e){return false}}
 try{speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>{}}catch(e){}
 let typeTimer=0;function typeText(){const el=$('#splashText');clearInterval(typeTimer);let i=0;const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(reduce){el.textContent=WELCOME;return}typeTimer=setInterval(()=>{i+=2;el.innerHTML=esc(WELCOME.slice(0,i))+'<span class="cur"></span>';if(i>=WELCOME.length)clearInterval(typeTimer)},45)}
